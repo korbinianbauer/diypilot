@@ -1,0 +1,107 @@
+Access point and client mode are both running as services so we should use systemd-networkd to switch off one service and switch on the other. With its options we are able to do it without rebooting. For reference I use Raspbian Stretch Lite 2019-04-08 full upgraded with sudo apt update && sudo apt full-upgrade && sudo reboot done at 2019-04-14.
+
+Setup systemd-networkd
+For detailed information look at (1). Here only in short. Execute these commands:
+
+# disable debian networking and dhcpcd
+rpi ~$ sudo -Es
+rpi ~# systemctl mask networking.service dhcpcd.service
+rpi ~# sudo mv /etc/network/interfaces /etc/network/interfaces~
+rpi ~# sed -i '1i resolvconf=NO' /etc/resolvconf.conf
+
+# enable systemd-networkd
+rpi ~# systemctl enable systemd-networkd.service systemd-resolved.service
+rpi ~# ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+Setup wpa_supplicant as wifi client with wlan0
+Setup wpa_supplicant with this file and your settings and enable it.
+
+rpi ~# cat >/etc/wpa_supplicant/wpa_supplicant-wlan0.conf <<EOF
+country=DE
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+
+network={
+    ssid="TestNet"
+    psk="verySecretPwassword"
+}
+EOF
+
+rpi ~# chmod 600 /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+rpi ~# systemctl disable wpa_supplicant.service
+rpi ~# systemctl enable wpa_supplicant@wlan0.service
+Setup wpa_supplicant as access point with ap0
+Create this configuration file:
+
+rpi ~# cat > /etc/wpa_supplicant/wpa_supplicant-ap0.conf <<EOF
+country=DE
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+
+network={
+    ssid="RPiNet"
+    mode=2
+    key_mgmt=WPA-PSK
+    proto=RSN WPA
+    psk="anotherPassword"
+    frequency=2412
+}
+EOF
+
+rpi ~# chmod 600 /etc/wpa_supplicant/wpa_supplicant-ap0.conf
+Configure interfaces
+Create these two configuration files:
+
+rpi ~# cat > /etc/systemd/network/08-wlan0.network <<EOF
+[Match]
+Name=wlan0
+[Network]
+DHCP=yes
+EOF
+
+rpi ~# cat > /etc/systemd/network/12-ap0.network <<EOF
+[Match]
+Name=ap0
+[Network]
+Address=192.168.4.1/24
+DHCPServer=yes
+[DHCPServer]
+DNS=84.200.69.80 1.1.1.1
+EOF
+Modify service for access point to use ap0
+ap0 is a virtual interface and it must be created and deleted with start/stop of the service. It is also required to modify dependencies. This cannot be done with a drop in file, so we have to modify the full service. In addition this service conflicts with the client connection service with wlan0. We set a dependency Conflicts= so we do not have to care about stopping the other service. Do it with:
+
+rpi ~# systemctl disable wpa_supplicant@ap0.service
+rpi ~# systemctl edit --full wpa_supplicant@ap0.service
+Modify/insert only these lines: Requires=, After=, Conflicts=, ExecStartPre= and ExecStopPost= as shown. Leave all other untouched, save it and quit the editor:
+
+[Unit]
+Description=WPA supplicant daemon (interface-specific version)
+Requires=sys-subsystem-net-devices-wlan0.device
+After=sys-subsystem-net-devices-wlan0.device
+Conflicts=wpa_supplicant@wlan0.service
+Before=network.target
+Wants=network.target
+
+# NetworkManager users will probably want the dbus version instead.
+
+[Service]
+Type=simple
+ExecStartPre=/sbin/iw dev wlan0 interface add ap0 type __ap
+ExecStart=/sbin/wpa_supplicant -c/etc/wpa_supplicant/wpa_supplicant-%I.conf -Dnl80211,wext -i%I
+ExecStopPost=/sbin/iw dev ap0 del
+
+[Install]
+Alias=multi-user.target.wants/wpa_supplicant@%i.service
+Now you can determine in which mode the RasPi should start after bootup. Just enable that service and disable the other one. If I want to start with client connection:
+
+rpi ~$ sudo systemctl enable wpa_supplicant@wlan0.service
+rpi ~$ sudo systemctl disable wpa_supplicant@ap0.service
+Reboot.
+
+You should then be able to switch the service with:
+
+rpi ~$ sudo systemctl start wpa_supplicant@ap0.service
+rpi ~$ sudo systemctl start wpa_supplicant@wlan0.service
+No need to stop a service.
+
+If you want to make the pi change between access point and client mode automatically, so that the pi provides an access point only if there is no known SSID nearby, then it isn't possible with this setup. The wpa_supplicant client service must always run so it can detect an available hotspot nearby. You can only switch on/off the access point in addition to the client service. So you have first to setup a Access point as WiFi repeater, optional with bridge or Access point as WiFi repeater with additional WiFi-dongle. Then you could use wpa_cli running as daemon with option -a to detect a connection to a hotspot and switch on/off the access point on the RasPi.

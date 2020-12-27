@@ -1,0 +1,1 @@
+sudo create_ap wlan0 eth0 'Jetson-AP' 'qweasdyxc' --freq-band 2.4 --no-virt -w 2
