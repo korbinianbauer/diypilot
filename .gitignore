@@ -1,2 +1,8 @@
 
 Jetson/autopilot/records/
+
+*.pyc
+
+*checkpoint.ipynb
+
+Jetson/autopilot/record/__pycache__/
