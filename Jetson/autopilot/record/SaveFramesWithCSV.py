@@ -121,6 +121,8 @@ with open(record_dir + str(time.ctime()) + '.csv', 'w', newline='') as csvfile:
 
     starttime = time.time()
     timestamp = time.time()
+    
+    framecounter = 0
     while (time.time() - starttime) < 1800:
         last_timestamp = timestamp
         timestamp = time.time()
@@ -140,13 +142,17 @@ with open(record_dir + str(time.ctime()) + '.csv', 'w', newline='') as csvfile:
         color_image = cv2.rotate(color_image, cv2.ROTATE_180)
 
         # Save frames to file and values to csv
-        color_frame_filename = str(timestamp) + '.jpg'
+        color_frame_filename = str(framecounter).zfill(7) + "_" + str(timestamp) + '.jpg'
         os.system('clear')
         actual_swa_deg = get_steering_wheel_angle(can_dict)
         speed = get_speed(can_dict)
         blinkers = get_blinker(can_dict)
-        csvwriter.writerow([color_frame_filename, actual_swa_deg, speed, blinkers[0], blinkers[1]])
-        cv2.imwrite(frame_dir + color_frame_filename, color_image)
+        if (speed > 0):
+            gui.set_recording(True)
+            csvwriter.writerow([color_frame_filename, actual_swa_deg, speed, blinkers[0], blinkers[1]])
+            cv2.imwrite(frame_dir + color_frame_filename, color_image)
+        else:
+            gui.set_recording(False)
         
         # GUI stuff
         t = datetime.datetime.fromtimestamp(timestamp)
