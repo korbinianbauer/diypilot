@@ -213,8 +213,13 @@ class RoadDataset(Sequence):
             radius = max_swa/swa * min_radius
             return radius
         
-    def crop_to_roi(self, frame):
-        crop_img = frame[self.roi_y:self.roi_y+self.roi_h, self.roi_x:self.roi_x+self.roi_w].copy()
+    @staticmethod
+    def crop_to_roi(frame):
+        roi_y = 190
+        roi_h = 210
+        roi_x = 0
+        roi_w = 848
+        crop_img = frame[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w].copy()
         return crop_img
         
      
