@@ -362,7 +362,10 @@ class AutopilotGUI():
          
         hor_axis = int(abs(frame_width*0.002*swa)) #0.002
         vert_axis = max(0, int(frame_height*0.5 - 0.2*hor_axis)) # - 0.5*...
-        center_coordinates = (int(frame_width*0.5 - hor_axis*np.sign(swa)), int(frame_height*1.0))
+        
+        x_center_offset = -16 # pixels, due to off center mounting of camera
+        
+        center_coordinates = (int(frame_width*0.5 + x_center_offset - hor_axis*np.sign(swa)), int(frame_height*1.0))
         axesLength = (hor_axis, vert_axis) 
         angle = 0
         
