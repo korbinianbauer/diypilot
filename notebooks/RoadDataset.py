@@ -20,6 +20,12 @@ class RoadDataset(Sequence):
         self.mode = mode
         self.indices = np.arange(len(self.csv))
         
+        # ROI
+        self.roi_y = 190
+        self.roi_h = 210
+        self.roi_x = 0
+        self.roi_w = 848
+        
         print('Loaded dataset with ' + str(len(self.csv)) + ' samples')
         
     def __len__(self):
@@ -43,7 +49,7 @@ class RoadDataset(Sequence):
         # Fetch a batch of inputs
         #sample_indices = range(batch_index * self.batch_size, (batch_index + 1) * self.batch_size)
         sample_indices = self.indices[(batch_index * self.batch_size):((batch_index + 1) * self.batch_size)]
-        return np.array([self.get_frame(sample_index)[0] for sample_index in sample_indices])
+        return np.array([self.get_cropped_frame(sample_index)[0] for sample_index in sample_indices])
 
     def __getitem__(self, batch_index):
         batch_x = self.get_batch_features(batch_index)
@@ -70,9 +76,9 @@ class RoadDataset(Sequence):
         csv = csv.drop(low_speed_indices)
         
         # Remove high Steering wheel angle samples
-        high_neg_swa_indices = csv[csv["steering_wheel_angle"] < -90].index
-        high_pos_swa_indices = csv[csv["steering_wheel_angle"] > 90].index
-        print("Removing " + str(len(high_neg_swa_indices) + len(high_pos_swa_indices)) + " rows for reason: High SWA (> +90/ < -90 deg)")
+        high_neg_swa_indices = csv[csv["steering_wheel_angle"] < -45].index
+        high_pos_swa_indices = csv[csv["steering_wheel_angle"] > 45].index
+        print("Removing " + str(len(high_neg_swa_indices) + len(high_pos_swa_indices)) + " rows for reason: High SWA (> +45/ < -45 deg)")
         csv = csv.drop(high_neg_swa_indices)
         csv = csv.drop(high_pos_swa_indices)
         
@@ -93,8 +99,8 @@ class RoadDataset(Sequence):
         csv = self.get_csv()
         print("Balancing dataset. Starting with " + str(len(csv)) + " samples.")
         
-        # Create 18 bins a 10 deg
-        range_bins = [[10*i, 10*(i+1)] for i in range(-9, 9)]
+        # Create 18 bins a 5 deg
+        range_bins = [[5*i, 5*(i+1)] for i in range(-9, 9)]
         #print(range_bins)
         
         idx_bins = [[] for i in range(18)]
@@ -135,12 +141,42 @@ class RoadDataset(Sequence):
     
     def get_swa(self, sample_index):
         return self.get_label(sample_index)
+    
+    def get_cropped_frame(self, index, shift = 0):
+        img_arr, csv = self.get_frame(index)
+        img_crop = self.crop_to_roi(img_arr)
+        
+        if shift == 0:
+            return img_crop, csv
+        
+        
+        # Locate points of the documents or object which you want to transform
+        # source:
+        frame_width = self.roi_w
+        frame_height = self.roi_h
+        src_pt1 = [0, 0]
+        src_pt2 = [frame_width, 0]
+        src_pt3 = [0 + shift, frame_height]
+        src_pt4 = [frame_width + shift, frame_height]
+        
+        pts1 = np.float32([src_pt1, src_pt2, src_pt3, src_pt4]) 
+        pts2 = np.float32([[0, 0], [frame_width, 0], [0, frame_height], [frame_width, frame_height]])
+
+        # Apply Perspective Transform Algorithm 
+        matrix = cv2.getPerspectiveTransform(pts1, pts2) 
+        result = cv2.warpPerspective(img_crop/255, matrix, (frame_width, frame_height), borderMode=cv2.BORDER_WRAP)
+        
+        return result*255, csv
         
     def get_frame(self, index):
         csv = self.get_csv(index)
         frame_path = self.frames_path + csv['filename']
         img = load_img(frame_path)
         img_arr = img_to_array(img)
+        
+       
+        
+        
         return img_arr, csv
     
     def get_velocity(self, sample_index):
@@ -176,6 +212,10 @@ class RoadDataset(Sequence):
         else:
             radius = max_swa/swa * min_radius
             return radius
+        
+    def crop_to_roi(self, frame):
+        crop_img = frame[self.roi_y:self.roi_y+self.roi_h, self.roi_x:self.roi_x+self.roi_w].copy()
+        return crop_img
         
      
     def get_frame_crop(self, index, shift=0):

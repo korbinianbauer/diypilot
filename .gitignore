@@ -6,3 +6,9 @@ Jetson/autopilot/records/
 *checkpoint.ipynb
 
 Jetson/autopilot/record/__pycache__/
+
+notebooks/datasets/
+
+*.avi
+
+*.odt#
