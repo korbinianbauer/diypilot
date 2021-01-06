@@ -17,7 +17,7 @@ dummy_frame = cv2.cvtColor(dummy_frame, cv2.COLOR_BGR2RGB)
 
 yappi.start()
 
-gui.show_window()
+gui.show_window(fullscreen=False)
   
 start_time = time.time()
 i = 0

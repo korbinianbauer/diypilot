@@ -42,31 +42,40 @@ class AutopilotGUI():
         self.last_update = 0 # timestamp
         self.last_render_timestamp = 0
         
-        self.gui_thread = None
-        
         package_directory = os.path.dirname(os.path.abspath(__file__))
         
-        engaged_border_file = font_file = os.path.join(package_directory, 'icons', 'engaged_border.png')
-        engaged_border = cv2.imread(engaged_border_file, cv2.IMREAD_UNCHANGED)
-        self.engaged_border = cv2.cvtColor(engaged_border, cv2.COLOR_BGRA2RGBA)
+        engaged_border_file = os.path.join(package_directory, 'icons', 'engaged_border.png')
+        icon = cv2.imread(engaged_border_file, cv2.IMREAD_UNCHANGED)
+        size = (848,48)
+        icon = cv2.resize(icon, size, interpolation = cv2.INTER_AREA)
+        self.engaged_border = cv2.cvtColor(icon, cv2.COLOR_BGRA2RGBA)
         
-        engaged_border_file = font_file = os.path.join(package_directory, 'icons', 'indicator_arrow_right.png')
-        indicator_icon = cv2.imread(engaged_border_file, cv2.IMREAD_UNCHANGED)
-        self.right_indicator_icon = cv2.cvtColor(indicator_icon, cv2.COLOR_BGRA2RGBA)
+        indicator_arrow_file = os.path.join(package_directory, 'icons', 'indicator_arrow_right.png')
+        icon = cv2.imread(indicator_arrow_file, cv2.IMREAD_UNCHANGED)
+        size = (42,48)
+        icon = cv2.resize(icon, size, interpolation = cv2.INTER_AREA)
+        self.right_indicator_icon = cv2.cvtColor(icon, cv2.COLOR_BGRA2RGBA)
     
+        icon = cv2.flip(self.right_indicator_icon, 1)
         self.left_indicator_icon = cv2.flip(self.right_indicator_icon, 1)
         
-        engaged_border_file = font_file = os.path.join(package_directory, 'icons', 'steering_wheel.png')
-        steering_wheel_icon = cv2.imread(engaged_border_file, cv2.IMREAD_UNCHANGED)
-        self.steering_wheel_icon = cv2.cvtColor(steering_wheel_icon, cv2.COLOR_BGRA2RGBA)
+        steering_wheel_file = os.path.join(package_directory, 'icons', 'steering_wheel.png')
+        icon = cv2.imread(steering_wheel_file, cv2.IMREAD_UNCHANGED)
+        size = (170,170)
+        icon = cv2.resize(icon, size, interpolation = cv2.INTER_AREA)
+        self.steering_wheel_icon = cv2.cvtColor(icon, cv2.COLOR_BGRA2RGBA)
         
-        engaged_border_file = font_file = os.path.join(package_directory, 'icons', 'steering_wheel_predict_indicator.png')
-        steering_wheel_predict_icon = cv2.imread(engaged_border_file, cv2.IMREAD_UNCHANGED)
-        self.steering_wheel_predict_icon = cv2.cvtColor(steering_wheel_predict_icon, cv2.COLOR_BGRA2RGBA)
+        steering_wheel_predict_indicator_file = os.path.join(package_directory, 'icons', 'steering_wheel_predict_indicator.png')
+        icon = cv2.imread(steering_wheel_predict_indicator_file, cv2.IMREAD_UNCHANGED)
+        ize = (170,170)
+        icon = cv2.resize(icon, size, interpolation = cv2.INTER_AREA)
+        self.steering_wheel_predict_icon = cv2.cvtColor(icon, cv2.COLOR_BGRA2RGBA)
         
-        engaged_border_file = font_file = os.path.join(package_directory, 'icons', 'cruise_control_icon.png')
-        cruise_control_icon = cv2.imread(engaged_border_file, cv2.IMREAD_UNCHANGED)
-        self.cruise_control_icon = cv2.cvtColor(cruise_control_icon, cv2.COLOR_BGRA2RGBA)
+        cruise_control_file = os.path.join(package_directory, 'icons', 'cruise_control_icon.png')
+        icon = cv2.imread(cruise_control_file, cv2.IMREAD_UNCHANGED)
+        size = (85, 85)
+        icon = cv2.resize(icon, size, interpolation = cv2.INTER_AREA)
+        self.cruise_control_icon = cv2.cvtColor(icon, cv2.COLOR_BGRA2RGBA)
 
         
         
@@ -419,7 +428,7 @@ class AutopilotGUI():
             
         size = (int(x_size), int(y_size))
             
-        overlay = cv2.resize(overlay, size, interpolation = cv2.INTER_AREA)
+        #overlay = cv2.resize(overlay, size, interpolation = cv2.INTER_AREA)
         overlay_width = overlay.shape[1]
         overlay_height = overlay.shape[0]
         
@@ -462,15 +471,15 @@ class AutopilotGUI():
     def get_rendered_gui(self):
         return self.frame_out
     
-    def show_window(self):
+    def show_window(self, fullscreen=True):
         if self.window_rendering_stopped == False:
             return
         else:
             self.window_rendering_stopped = False
-            #cv2.namedWindow("Autopilot GUI", cv2.WINDOW_FREERATIO)
-            #cv2.setWindowProperty("Autopilot GUI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-            self.gui_thread = Thread(target=self.render_window, args=())
-            self.gui_thread.start()
+            if fullscreen:
+                cv2.namedWindow("Autopilot GUI", cv2.WINDOW_FREERATIO)
+                cv2.setWindowProperty("Autopilot GUI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            Thread(target=self.render_window, args=()).start()
         return self
 
     def render_window(self):
@@ -496,10 +505,10 @@ class AutopilotGUI():
                     # detect loss of video
                     self.set_frame(self.get_dummy_frame())
                     
+        self.stop_window()
                 
     def stop_window(self):
         self.window_rendering_stopped = True
-        self.gui_thread.join()
         cv2.destroyAllWindows()
     
 
