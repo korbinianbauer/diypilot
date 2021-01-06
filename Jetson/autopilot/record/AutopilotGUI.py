@@ -42,6 +42,8 @@ class AutopilotGUI():
         self.last_frame_update = 0 # timestamp
         self.last_render_timestamp = 0
         
+        self.min_frame_time = 0.03 # s, Don't re-render until this time has passed
+        
         package_directory = os.path.dirname(os.path.abspath(__file__))
         
         engaged_border_file = os.path.join(package_directory, 'icons', 'engaged_border.png')
@@ -322,41 +324,35 @@ class AutopilotGUI():
     
     def render_engaged_border(self, frame):
         position = (0.5, 0.05)
-        size = (1,0.1)
         overlay = self.engaged_border
-        self.overlay_transparent(frame, overlay, position, size)
+        self.overlay_transparent(frame, overlay, position)
         
     def render_left_indicator(self, frame):
         position = (0.25, 0.07)
-        size = (0.05,0.1)
         overlay = self.left_indicator_icon
-        self.overlay_transparent(frame, overlay, position, size)
+        self.overlay_transparent(frame, overlay, position)
         
     def render_right_indicator(self, frame):
         position = (0.75, 0.07)
-        size = (0.05,0.1)
         overlay = self.right_indicator_icon
-        self.overlay_transparent(frame, overlay, position, size)
+        self.overlay_transparent(frame, overlay, position)
         
     def render_steering_wheel(self, frame):
         position = (0.9,0.75)
-        size = (0.2,None)
         overlay = self.steering_wheel_icon.copy()
         overlay = self.rotate_image(overlay, self.get_actual_swa())
-        self.overlay_transparent(frame, overlay, position, size)
+        self.overlay_transparent(frame, overlay, position)
         
     def render_predicted_swa_indicator(self, frame):
         position = (0.9,0.75)
-        size = (0.2,None)
         overlay = self.steering_wheel_predict_icon.copy()
         overlay = self.rotate_image(overlay, self.get_predicted_swa())
-        self.overlay_transparent(frame, overlay, position, size)
+        self.overlay_transparent(frame, overlay, position)
         
     def render_cruise_control(self, frame):
         icon_position = (0.06,0.8)
-        icon_size = (0.1,None)
         overlay = self.cruise_control_icon.copy()
-        self.overlay_transparent(frame, overlay, icon_position, icon_size)
+        self.overlay_transparent(frame, overlay, icon_position)
         
         #text = str(round(self.get_cc_setpoint()))
         text = str(round(self.get_cruise_control_setpoint()))
@@ -412,25 +408,11 @@ class AutopilotGUI():
         result = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
         return result
     
-    def overlay_transparent(self, background, overlay, rel_pos, rel_size):
+    def overlay_transparent(self, background, overlay, rel_pos):
 
         background_width = background.shape[1]
         background_height = background.shape[0]
-        overlay_width = overlay.shape[1]
-        overlay_height = overlay.shape[0]
-        
-        x_size = rel_size[0] * background_width
-        if rel_size[1] == None: # equal scale
-            y_size = overlay_height / overlay_width * x_size
-        else:
-            y_size = rel_size[1] * background_height
-            
-        size = (int(x_size), int(y_size))
-            
-        #overlay = cv2.resize(overlay, size, interpolation = cv2.INTER_AREA)
-        overlay_width = overlay.shape[1]
-        overlay_height = overlay.shape[0]
-        
+        overlay_height, overlay_width = overlay.shape[0], overlay.shape[1]
         
         # get coords based on boundary
         x = int((background_width * rel_pos[0]) - overlay_width/2)
@@ -439,15 +421,13 @@ class AutopilotGUI():
         if x >= background_width or y >= background_height:
             return background
 
-        h, w = overlay.shape[0], overlay.shape[1]
+        if x + overlay_width > background_width:
+            overlay_width = background_width - x
+            overlay = overlay[:, :overlay_width]
 
-        if x + w > background_width:
-            w = background_width - x
-            overlay = overlay[:, :w]
-
-        if y + h > background_height:
+        if y + overlay_height > background_height:
             h = background_height - y
-            overlay = overlay[:h]
+            overlay = overlay[:overlay_height]
 
         if overlay.shape[2] < 4:
             overlay = np.concatenate(
@@ -461,7 +441,7 @@ class AutopilotGUI():
         overlay_image = overlay[..., :3]
         mask = overlay[..., 3:] / 255.0
 
-        background[y:y+h, x:x+w] = (1.0 - mask) * background[y:y+h, x:x+w] + mask * overlay_image
+        background[y:y+overlay_height, x:x+overlay_width] = (1.0 - mask) * background[y:y+overlay_height, x:x+overlay_width] + mask * overlay_image
 
         return background
 
@@ -496,6 +476,12 @@ class AutopilotGUI():
             
             cv2.imshow("Autopilot GUI", gui_frame_bgr)
             
+            
+            
+            while (time.time() - self.last_render_timestamp) < self.min_frame_time:
+                if cv2.waitKey(1) == ord("q"):
+                    self.window_rendering_stopped = True
+            
             while not self.get_updated():
                 if cv2.waitKey(1) == ord("q"):
                     self.window_rendering_stopped = True
@@ -503,6 +489,8 @@ class AutopilotGUI():
                 if (time.time() - self.get_last_frame_update()) > 1:
                     # detect loss of video
                     self.set_frame(self.get_dummy_frame())
+                    
+            
                     
         self.stop_window()
                 
