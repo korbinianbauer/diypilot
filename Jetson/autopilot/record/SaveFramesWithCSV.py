@@ -10,6 +10,9 @@ import _thread
 
 import can
 
+import tensorflow as tf
+from tensorflow import keras
+
 from AutopilotGUI import AutopilotGUI
 
 os.system("sudo ip link set can0 up type can bitrate 33300")
@@ -27,6 +30,15 @@ try:
    _thread.start_new_thread( read_can, ("Thread-1", ) )
 except:
    print("Error: unable to start thread")
+   
+   
+def crop_to_roi(frame):
+        roi_y = 190
+        roi_h = 210
+        roi_x = 0
+        roi_w = 848
+        crop_img = frame[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w].copy()
+        return crop_img
    
 def get_steering_wheel_angle(can_dict):
     
@@ -106,10 +118,16 @@ color_sensor.set_option(rs.option.auto_exposure_priority, 0)
 record_timestamp = time.ctime()
 
 # create new recording dir
-record_dir = "/home/jetson/autopilot/records/" + record_timestamp + "/"
+record_dir = "/home/jetson/diypilot/Jetson/autopilot/records/" + record_timestamp + "/"
 frame_dir = record_dir + "frames/"
 os.mkdir(record_dir)
 os.mkdir(frame_dir)
+
+# Load NN
+tf.config.list_physical_devices('GPU')
+model_name = 'diypilot_v9_small_FC_epoch_3'
+loaded_model = keras.models.load_model('/home/jetson/diypilot/notebooks/trained_models/' + model_name + '.h5')
+loaded_model.summary()
 
 with open(record_dir + str(time.ctime()) + '.csv', 'w', newline='') as csvfile:
     csvwriter = csv.writer(csvfile, delimiter=',')
@@ -121,6 +139,8 @@ with open(record_dir + str(time.ctime()) + '.csv', 'w', newline='') as csvfile:
 
     starttime = time.time()
     timestamp = time.time()
+    
+    framecounter = 0
     while (time.time() - starttime) < 1800:
         last_timestamp = timestamp
         timestamp = time.time()
@@ -138,15 +158,30 @@ with open(record_dir + str(time.ctime()) + '.csv', 'w', newline='') as csvfile:
         #depth_image = np.asanyarray(depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
         color_image = cv2.rotate(color_image, cv2.ROTATE_180)
+        
+        
+        # Run model
+        frame_crop = crop_to_roi(color_image)
+        test_data = np.expand_dims(frame_crop, axis=0)
+        start = time.time()
+        predictions = loaded_model.predict(test_data)
+        predicted_swa = predictions[0][0]*90
+        #print(predictions[0][0]*90)
+        end = time.time()
+        print("Inference took {}s".format(end-start))
 
         # Save frames to file and values to csv
-        color_frame_filename = str(timestamp) + '.jpg'
+        color_frame_filename = str(framecounter).zfill(7) + "_" + str(timestamp) + '.jpg'
         os.system('clear')
         actual_swa_deg = get_steering_wheel_angle(can_dict)
         speed = get_speed(can_dict)
         blinkers = get_blinker(can_dict)
-        csvwriter.writerow([color_frame_filename, actual_swa_deg, speed, blinkers[0], blinkers[1]])
-        cv2.imwrite(frame_dir + color_frame_filename, color_image)
+        if (speed > 0):
+            gui.set_recording(True)
+            csvwriter.writerow([color_frame_filename, actual_swa_deg, speed, blinkers[0], blinkers[1]])
+            cv2.imwrite(frame_dir + color_frame_filename, color_image)
+        else:
+            gui.set_recording(False)
         
         # GUI stuff
         t = datetime.datetime.fromtimestamp(timestamp)
@@ -155,6 +190,7 @@ with open(record_dir + str(time.ctime()) + '.csv', 'w', newline='') as csvfile:
         bgr_image = cv2.cvtColor(color_image, cv2.COLOR_RGB2BGR)
         gui.set_frame(bgr_image)
         gui.set_actual_swa(actual_swa_deg)
+        gui.set_predicted_swa(predicted_swa)
         gui.set_indicator_left(blinkers[0])
         gui.set_indicator_right(blinkers[1])
         gui.set_velocity(speed)
