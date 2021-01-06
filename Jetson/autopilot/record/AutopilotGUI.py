@@ -8,6 +8,7 @@ from PIL import Image
 from threading import Thread
 import os
 
+
 class AutopilotGUI():
     
     def __init__(self):
