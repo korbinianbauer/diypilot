@@ -42,6 +42,8 @@ class AutopilotGUI():
         self.last_update = 0 # timestamp
         self.last_render_timestamp = 0
         
+        self.gui_thread = None
+        
         package_directory = os.path.dirname(os.path.abspath(__file__))
         
         engaged_border_file = font_file = os.path.join(package_directory, 'icons', 'engaged_border.png')
@@ -465,9 +467,10 @@ class AutopilotGUI():
             return
         else:
             self.window_rendering_stopped = False
-            cv2.namedWindow("Autopilot GUI", cv2.WINDOW_FREERATIO)
-            cv2.setWindowProperty("Autopilot GUI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-            Thread(target=self.render_window, args=()).start()
+            #cv2.namedWindow("Autopilot GUI", cv2.WINDOW_FREERATIO)
+            #cv2.setWindowProperty("Autopilot GUI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            self.gui_thread = Thread(target=self.render_window, args=())
+            self.gui_thread.start()
         return self
 
     def render_window(self):
@@ -493,10 +496,10 @@ class AutopilotGUI():
                     # detect loss of video
                     self.set_frame(self.get_dummy_frame())
                     
-        self.stop_window()
                 
     def stop_window(self):
         self.window_rendering_stopped = True
+        self.gui_thread.join()
         cv2.destroyAllWindows()
     
 
