@@ -42,7 +42,7 @@ class AutopilotGUI():
         self.last_frame_update = 0 # timestamp
         self.last_render_timestamp = 0
         
-        self.min_frame_time = 0#.03 # s, Don't re-render until this time has passed
+        self.min_frame_time = 0.04 # s, Don't re-render until this time has passed
         
         package_directory = os.path.dirname(os.path.abspath(__file__))
         
