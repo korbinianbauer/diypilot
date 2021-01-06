@@ -39,7 +39,7 @@ class AutopilotGUI():
         self.frame_out = None
         self.window_rendering_stopped = True
         self.updated = True
-        self.last_update = 0 # timestamp
+        self.last_frame_update = 0 # timestamp
         self.last_render_timestamp = 0
         
         package_directory = os.path.dirname(os.path.abspath(__file__))
@@ -84,17 +84,16 @@ class AutopilotGUI():
         height, width, channels = frame.shape
         self.resolution = [width, height]
         self.set_updated(True)
+        self.last_frame_update = time.time()
         
     def set_updated(self, updated):
         self.updated = updated
-        if updated:
-            self.last_update = time.time()
-    
+            
     def get_updated(self):
         return self.updated
     
-    def get_last_update(self):
-        return self.last_update
+    def get_last_frame_update(self):
+        return self.last_frame_update
         
     def set_show_overlay(self, show_overlay):
         self.show_overlay = show_overlay
@@ -277,8 +276,8 @@ class AutopilotGUI():
         text_y = shadow_y #+ (shadow_bounds[1] - text_bounds[1])//2
 
         # add text centered on image
-        cv2.putText(frame, text, (shadow_x, shadow_y ), font, size, shadow_color, shadow_thickness, cv2.LINE_AA)
-        cv2.putText(frame, text, (text_x, text_y ), font, size, text_color, text_thickness, cv2.LINE_AA)
+        cv2.putText(frame, text, (shadow_x, shadow_y ), font, size, shadow_color, shadow_thickness)
+        cv2.putText(frame, text, (text_x, text_y ), font, size, text_color, text_thickness)
         
     
     def render_time(self, frame):
@@ -501,7 +500,7 @@ class AutopilotGUI():
                 if cv2.waitKey(1) == ord("q"):
                     self.window_rendering_stopped = True
                     
-                if (time.time() - self.get_last_update()) > 1:
+                if (time.time() - self.get_last_frame_update()) > 1:
                     # detect loss of video
                     self.set_frame(self.get_dummy_frame())
                     
