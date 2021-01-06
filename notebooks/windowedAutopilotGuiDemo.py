@@ -22,6 +22,7 @@ gui.show_window(fullscreen=False)
 start_time = time.time()
 i = 0
 while (time.time() - start_time) < 10:
+    #dummy_frame = cv2.rotate(dummy_frame, cv2.ROTATE_180)
     frame = dummy_frame
     show_overlay = True
     engaged = True

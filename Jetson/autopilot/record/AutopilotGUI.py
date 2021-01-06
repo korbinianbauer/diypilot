@@ -42,7 +42,7 @@ class AutopilotGUI():
         self.last_frame_update = 0 # timestamp
         self.last_render_timestamp = 0
         
-        self.min_frame_time = 0.03 # s, Don't re-render until this time has passed
+        self.min_frame_time = 0#.03 # s, Don't re-render until this time has passed
         
         package_directory = os.path.dirname(os.path.abspath(__file__))
         
@@ -214,7 +214,8 @@ class AutopilotGUI():
         frame_out = self.get_frame().copy()
         
         if self.get_engaged():
-            self.render_engaged_border(frame_out)
+            #self.render_engaged_border(frame_out)
+            pass
         
         if not self.get_show_overlay():
             self.frame_out = frame_out
@@ -235,10 +236,10 @@ class AutopilotGUI():
             self.render_cruise_control(frame_out)
             
         if self.get_show_predicted_swa():
-            self.render_predicted_swa_indicator(frame_out)
+            #self.render_predicted_swa_indicator(frame_out)
             self.render_predicted_path(frame_out)
             
-        self.render_steering_wheel(frame_out)
+        #self.render_steering_wheel(frame_out)
         self.render_actual_swa(frame_out)
         self.render_actual_path(frame_out)
             
