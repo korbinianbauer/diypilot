@@ -161,11 +161,12 @@ with open(record_dir + str(time.ctime()) + '.csv', 'w', newline='') as csvfile:
         
         
         # Run model
-        frame_crop = crop_to_roi(color_image)
-        test_data = np.expand_dims(frame_crop, axis=0)
+        #frame_crop = crop_to_roi(color_image)
+        #test_data = np.expand_dims(frame_crop, axis=0)
         start = time.time()
-        predictions = loaded_model.predict(test_data)
-        predicted_swa = predictions[0][0]*90
+        predicted_swa = 0
+        #predictions = loaded_model.predict(test_data)
+        #predicted_swa = predictions[0][0]*90
         #print(predictions[0][0]*90)
         end = time.time()
         print("Inference took {}s".format(end-start))
