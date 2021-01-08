@@ -44,6 +44,7 @@ class AutopilotGUI():
         self.last_render_timestamp = 0
         
         self.min_frame_time = 0.04 # s, Don't re-render until this time has passed
+        self.gui_thread = None
         
         package_directory = os.path.dirname(os.path.abspath(__file__))
         
@@ -83,6 +84,7 @@ class AutopilotGUI():
         
         
     def set_frame(self, frame):
+        
         self.frame = frame
         height, width, channels = frame.shape
         self.resolution = [width, height]
@@ -213,6 +215,7 @@ class AutopilotGUI():
             self.set_frame(self.get_dummy_frame())
             
         frame_out = self.get_frame().copy()
+        frame_out = cv2.cvtColor(frame_out, cv2.COLOR_RGB2BGR)
         
         if self.get_engaged():
             #self.render_engaged_border(frame_out)
@@ -460,7 +463,7 @@ class AutopilotGUI():
             if fullscreen:
                 cv2.namedWindow("Autopilot GUI", cv2.WINDOW_FREERATIO)
                 cv2.setWindowProperty("Autopilot GUI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-            Thread(target=self.render_window, args=()).start()
+            self.gui_thread = Thread(target=self.render_window, args=()).start()
         return self
 
     def render_window(self):
@@ -483,14 +486,17 @@ class AutopilotGUI():
             while (time.time() - self.last_render_timestamp) < self.min_frame_time:
                 if cv2.waitKey(1) == ord("q"):
                     self.window_rendering_stopped = True
+                    break
             
             while not self.get_updated():
                 if cv2.waitKey(1) == ord("q"):
                     self.window_rendering_stopped = True
+                    break
                     
                 if (time.time() - self.get_last_frame_update()) > 1:
                     # detect loss of video
                     self.set_frame(self.get_dummy_frame())
+                
                     
             
                     
@@ -498,6 +504,8 @@ class AutopilotGUI():
                 
     def stop_window(self):
         self.window_rendering_stopped = True
+        if not self.gui_thread is None:
+            self.gui_thread.join()
         cv2.destroyAllWindows()
     
 
