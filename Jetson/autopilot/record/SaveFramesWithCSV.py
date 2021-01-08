@@ -31,6 +31,8 @@ sample_writer_thread = None
 demo_mode = True
 min_frame_time = 0.06667 # s, Don't re-run mainloop until this time has passed
 
+cam_fps = 0
+can_sps = 0
 
 bus = None
 can_dict = {}
@@ -43,12 +45,18 @@ def start_can_reader():
 
 def read_can(threadName):
     global can_dict
+    global can_sps
+    last_can_time = time.time()
     while not stop_threads:
         if bus is None:
             os.system("sudo ip link set can0 up type can bitrate 33300")
             bus = can.interface.Bus('can0', bustype='socketcan')
         message = bus.recv()
         can_dict[message.arbitration_id] = message
+        now = time.time()
+        can_sps = 1/(now - last_can_time)
+        last_can_time = now
+        #print("read_can()")
     print("CAN-read Thread finished")
 
   
@@ -94,6 +102,7 @@ def get_cam_frame():
     global camera_frame_crop
     global frame_crop_tensor
     global pipeline
+    global cam_fps
     
     last_frame_time = time.time()
     while not stop_threads:
@@ -109,10 +118,11 @@ def get_cam_frame():
         # The model expects a batch of images, so add an axis with `tf.newaxis`.
         frame_crop_tensor = input_tensor[tf.newaxis,...]
         now = time.time()
-        #print("Cam fps: {}".format(round(1/(now - last_frame_time), 2)))
+        cam_fps = 1/(now - last_frame_time)
         #print("Shape :{}".format(camera_frame.shape))
         #print("Crop shape :{}".format(camera_frame_crop.shape))
         last_frame_time = now
+        #print("get_cam_frame()")
     pipeline.stop()
     print("Camera read Thread finished")
     
@@ -128,6 +138,7 @@ def crop_to_roi(frame):
 read_camera()
 
 def stop_all_threads():
+    global stop_threads
     stop_threads = True
 
 sample_to_disk_queue = deque()
@@ -150,14 +161,18 @@ def write_sample_to_disk(record_dir, frame_dir):
     print("write_sample_to_disk()")
     with open(record_dir + str(time.ctime()) + '.csv', 'w', newline='') as csvfile:
         csvwriter = csv.writer(csvfile, delimiter=',')
+
         while sample_to_disk_queue or not stop_threads:
             if sample_to_disk_queue:
                 sample = sample_to_disk_queue.popleft() # get oldest sample
                 color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers = sample
                 csvwriter.writerow([color_frame_filename, actual_swa_deg, speed, blinkers[0], blinkers[1]])
                 cv2.imwrite(frame_dir + color_frame_filename, camera_frame)
+
+
             else:
                 time.sleep(0.01)
+            #print("write_sample_to_disk()")
     print("sample_writer Thread finished")
         
 
@@ -328,6 +343,10 @@ while (time.time() - starttime) < 20:
     gui.set_timestring(s)
    # 
     gui.set_frame(camera_frame)
+    gui.set_nn_fps(mainloop_fps)
+    gui.set_cam_fps(cam_fps)
+    gui.set_rec_queue_len(len(sample_to_disk_queue))
+    gui.set_can_sps(can_sps)
     gui.set_actual_swa(actual_swa_deg)
     gui.set_predicted_swa(predicted_swa)
     gui.set_indicator_left(blinkers[0])

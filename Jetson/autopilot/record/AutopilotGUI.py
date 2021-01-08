@@ -34,6 +34,10 @@ class AutopilotGUI():
         self.show_predicted_swa = True
         self.time_string = ""
         self.gui_fps = 0
+        self.nn_fps = 0
+        self.cam_fps = 0
+        self.can_sps = 0
+        self.rec_queue_len = 0
         self.freespace = 0
         self.recording = False
         
@@ -125,6 +129,30 @@ class AutopilotGUI():
     
     def get_gui_fps(self):
         return self.gui_fps
+        
+    def set_nn_fps(self, fps):
+        self.nn_fps = fps
+    
+    def get_nn_fps(self):
+        return self.nn_fps
+        
+    def set_cam_fps(self, fps):
+        self.cam_fps = fps
+    
+    def get_cam_fps(self):
+        return self.cam_fps
+        
+    def set_rec_queue_len(self, rec_queue_len):
+        self.rec_queue_len = rec_queue_len
+    
+    def get_rec_queue_len(self):
+        return self.rec_queue_len
+        
+    def set_can_sps(self, sps):
+        self.can_sps = sps
+    
+    def get_can_sps(self):
+        return self.can_sps
     
     def set_engaged(self, engaged):
         self.engaged = engaged
@@ -230,6 +258,10 @@ class AutopilotGUI():
         if self.get_recording():
             self.render_rec(frame_out)
         self.render_gui_fps(frame_out)
+        self.render_nn_fps(frame_out)
+        self.render_cam_fps(frame_out)
+        self.render_rec_queue_len(frame_out)
+        self.render_can_sps(frame_out)
         self.render_velocity(frame_out)
         self.render_freespace(frame_out)
         if self.get_indicator_left():
@@ -283,8 +315,8 @@ class AutopilotGUI():
         text_y = shadow_y #+ (shadow_bounds[1] - text_bounds[1])//2
 
         # add text centered on image
-        cv2.putText(frame, text, (shadow_x, shadow_y ), font, size, shadow_color, shadow_thickness)
-        cv2.putText(frame, text, (text_x, text_y ), font, size, text_color, text_thickness)
+        cv2.putText(frame, text, (shadow_x, shadow_y ), font, size, shadow_color, shadow_thickness, cv2.LINE_AA)
+        cv2.putText(frame, text, (text_x, text_y ), font, size, text_color, text_thickness, cv2.LINE_AA)
         
     
     def render_time(self, frame):
@@ -306,6 +338,33 @@ class AutopilotGUI():
         size = 0.8
         rel_pos = (1.0, 0.1)
         self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_nn_fps(self, frame):
+        text = "NN: {} fps".format(round(self.get_nn_fps(), 1))
+        size = 0.8
+        rel_pos = (1.0, 0.15)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_cam_fps(self, frame):
+        text = "Cam: {} fps".format(round(self.get_cam_fps(), 1))
+        size = 0.8
+        rel_pos = (1.0, 0.2)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_can_sps(self, frame):
+        text = "CAN: {} Hz".format(round(self.get_can_sps(), 1))
+        size = 0.8
+        rel_pos = (1.0, 0.25)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_rec_queue_len(self, frame):
+        text = "Rec buf: {}".format(self.get_rec_queue_len())
+        size = 0.8
+        rel_pos = (1.0, 0.3)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+        
+        
         
     def render_actual_swa(self, frame):
         text = str(round(self.get_actual_swa(), 1)) + " deg"
@@ -506,6 +565,7 @@ class AutopilotGUI():
         self.window_rendering_stopped = True
         if not self.gui_thread is None:
             self.gui_thread.join()
+            print("GUI render Thread finished")
         cv2.destroyAllWindows()
     
 
