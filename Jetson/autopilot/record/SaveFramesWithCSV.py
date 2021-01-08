@@ -24,35 +24,35 @@ from AutopilotGUI import AutopilotGUI
 from collections import deque
 
 stop_threads = False
-cam_thread = None
+can_thread = None
+camera_thread = None
+sample_writer_thread = None
 
 demo_mode = True
-
+min_frame_time = 0.06667 # s, Don't re-run mainloop until this time has passed
 
 
 bus = None
 can_dict = {}
 
 # Own thread that continuously reads the CAN bus
+def start_can_reader():
+    if demo_mode:
+        return
+    can_thread = Thread(target=read_can, args=()).start()
+
 def read_can(threadName):
     global can_dict
     while not stop_threads:
-        if demo_mode:
-            time.sleep(1)
-            continue
         if bus is None:
             os.system("sudo ip link set can0 up type can bitrate 33300")
             bus = can.interface.Bus('can0', bustype='socketcan')
         message = bus.recv()
         can_dict[message.arbitration_id] = message
-    print("CAN read Thread finished")
+    print("CAN-read Thread finished")
 
-try:
-   _thread.start_new_thread( read_can, ("Thread-1", ) )
-except:
-   print("Error: unable to start thread")
   
-  
+start_can_reader()
   
 camera_frame = []
 camera_frame_crop = []
@@ -61,9 +61,9 @@ frame_crop_tensor = None
 pipeline = None
 # Own thread that continuously reads the camera frame
 def read_camera():
-        global cam_thread
+        global camera_thread
         global pipeline
-        if cam_thread is None:
+        if camera_thread is None:
             # Configure depth and color streams
             pipeline = rs.pipeline()
             config = rs.config()
@@ -83,11 +83,10 @@ def read_camera():
             color_sensor.set_option(rs.option.auto_exposure_priority, 0)
             color_sensor.set_option(rs.option.frames_queue_size, 1)
             
-            cam_thread = Thread(target=get_cam_frame, args=()).start()
+            camera_thread = Thread(target=get_cam_frame, args=()).start()
         return
         
-def stop_all_threads():
-    stop_threads = True
+
     
         
 def get_cam_frame():
@@ -128,6 +127,8 @@ def crop_to_roi(frame):
         
 read_camera()
 
+def stop_all_threads():
+    stop_threads = True
 
 sample_to_disk_queue = deque()
 
@@ -141,7 +142,7 @@ def sample_writer():
     os.mkdir(frame_dir)
     
     print("Starting sample_writer Thread")
-    cam_thread = Thread(target=write_sample_to_disk, args=(record_dir, frame_dir)).start()
+    sample_writer_thread = Thread(target=write_sample_to_disk, args=(record_dir, frame_dir)).start()
     
 
 def write_sample_to_disk(record_dir, frame_dir):
@@ -254,7 +255,7 @@ print("Warumup done ({}s)".format(round(time.time()-warmup_start, 2)))
 yappi.start()
 
 gui = AutopilotGUI()
-gui.show_window(fullscreen=False)
+gui.show_window(fullscreen=True)
 gui.set_show_overlay(True)
 gui.set_engaged(False)
 
@@ -269,7 +270,7 @@ mainloop_fps_max = 0
 
 steady_frame_crop = camera_frame_crop[:]
 
-while (time.time() - starttime) < 30:
+while (time.time() - starttime) < 20:
 
     
     
@@ -353,7 +354,8 @@ while (time.time() - starttime) < 30:
     
     print("Mainloop (incl prints) took: {}ms".format(round(1000*(mainloop_done-timestamp), 2)))
     
-    #time.sleep(1)
+    while (time.time() - timestamp) < min_frame_time:
+        time.sleep(0.001)
     
 
 stop_all_threads()

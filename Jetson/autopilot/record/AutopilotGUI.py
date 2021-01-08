@@ -33,7 +33,7 @@ class AutopilotGUI():
         self.predicted_swa = 0
         self.show_predicted_swa = True
         self.time_string = ""
-        self.fps = 0
+        self.gui_fps = 0
         self.freespace = 0
         self.recording = False
         
@@ -43,7 +43,7 @@ class AutopilotGUI():
         self.last_frame_update = 0 # timestamp
         self.last_render_timestamp = 0
         
-        self.min_frame_time = 0.04 # s, Don't re-render until this time has passed
+        self.min_frame_time = 0.033 # s, Don't re-render until this time has passed
         self.gui_thread = None
         
         package_directory = os.path.dirname(os.path.abspath(__file__))
@@ -120,11 +120,11 @@ class AutopilotGUI():
     def get_resolution(self):
         return self.resolution
     
-    def set_fps(self, fps):
-        self.fps = fps
+    def set_gui_fps(self, fps):
+        self.gui_fps = fps
     
-    def get_fps(self):
-        return self.fps
+    def get_gui_fps(self):
+        return self.gui_fps
     
     def set_engaged(self, engaged):
         self.engaged = engaged
@@ -229,7 +229,7 @@ class AutopilotGUI():
         self.render_time(frame_out)
         if self.get_recording():
             self.render_rec(frame_out)
-        self.render_fps(frame_out)
+        self.render_gui_fps(frame_out)
         self.render_velocity(frame_out)
         self.render_freespace(frame_out)
         if self.get_indicator_left():
@@ -301,8 +301,8 @@ class AutopilotGUI():
         rel_pos = (0.05, 0.05)
         self.render_text(frame, text, rel_pos, size, text_color, shadow_color)
         
-    def render_fps(self, frame):
-        text = str(round(self.get_fps(), 1)) + " fps (GUI)"
+    def render_gui_fps(self, frame):
+        text = "GUI: {} fps".format(round(self.get_gui_fps(), 1))
         size = 0.8
         rel_pos = (1.0, 0.1)
         self.render_text(frame, text, rel_pos, size, hor_align = 1)
@@ -470,7 +470,7 @@ class AutopilotGUI():
         while not self.window_rendering_stopped:
             last_last_render_timestamp = self.last_render_timestamp
             self.last_render_timestamp = time.time()
-            self.set_fps(1/(self.last_render_timestamp - last_last_render_timestamp))
+            self.set_gui_fps(1/(self.last_render_timestamp - last_last_render_timestamp))
             start_time = time.time()
             self.render()
             end_time = time.time()
