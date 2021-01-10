@@ -1,15 +1,26 @@
+import os
+print("\n\n\n\nCWD:")
+print(os.getcwd())
+os.chdir('/home/jetson/diypilot/Jetson/autopilot/record')
+print(os.getcwd())
+
+import sys
+sys.path.append('/home/jetson/Desktop/librealsense-2.39.0/build/wrappers/python')
+
+import time
+
 import yappi
-yappi.set_clock_type("WALL")
+yappi.set_clock_type("cpu")
 
 
 import pyrealsense2 as rs
 import cv2
 import csv
-import time
 import datetime
 import numpy as np
 import binascii
 import os
+import shutil 
 import _thread
 
 from threading import Thread
@@ -29,7 +40,7 @@ camera_thread = None
 sample_writer_thread = None
 
 demo_mode = True
-min_frame_time = 0.06667 # s, Don't re-run mainloop until this time has passed
+min_frame_time = 0.066 # s, Don't re-run mainloop until this time has passed
 
 cam_fps = 0
 can_sps = 0
@@ -78,7 +89,13 @@ def read_camera():
             config.enable_stream(rs.stream.color, 848, 480, rs.format.bgr8, 15)
 
             # Start streaming
-            profile = pipeline.start(config)
+            profile = None
+            while profile is None:
+                try:
+                    profile = pipeline.start(config)
+                except:
+                    print("Could not connect to RealSense Camera. Retrying in 1s")
+                    time.sleep(1)
             device = profile.get_device()
             roi_sensor = device.first_roi_sensor()
             sensor_roi = roi_sensor.get_region_of_interest()
@@ -320,6 +337,7 @@ while (time.time() - starttime) < 20:
     actual_swa_deg = get_steering_wheel_angle(can_dict)
     speed = get_speed(can_dict)
     blinkers = get_blinker(can_dict)
+    freespace = shutil.disk_usage("/home/jetson")[-1]/1024/1024/1024
     
     collecting_values_done = time.time()
     
@@ -347,6 +365,7 @@ while (time.time() - starttime) < 20:
     gui.set_cam_fps(cam_fps)
     gui.set_rec_queue_len(len(sample_to_disk_queue))
     gui.set_can_sps(can_sps)
+    gui.set_freespace(freespace)
     gui.set_actual_swa(actual_swa_deg)
     gui.set_predicted_swa(predicted_swa)
     gui.set_indicator_left(blinkers[0])
