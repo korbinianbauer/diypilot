@@ -125,7 +125,8 @@ os.mkdir(frame_dir)
 
 # Load NN
 tf.config.list_physical_devices('GPU')
-model_name = 'diypilot_v9_small_FC_epoch_3'
+#model_name = 'diypilot_v9_small_FC_epoch_3'
+model_name = 'diypilot_v11_full_balance_epoch_10'
 loaded_model = keras.models.load_model('/home/jetson/diypilot/notebooks/trained_models/' + model_name + '.h5')
 loaded_model.summary()
 
