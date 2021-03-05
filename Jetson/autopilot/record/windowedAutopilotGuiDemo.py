@@ -11,7 +11,7 @@ dummy_frame = cv2.imread("./frame1.jpg")
 dummy_frame = cv2.rotate(dummy_frame, cv2.ROTATE_180)
 dummy_frame = cv2.cvtColor(dummy_frame, cv2.COLOR_BGR2RGB) 
 
-gui.show_window()
+gui.show_window(fullscreen=False)
 time.sleep(3)
 
     
@@ -25,7 +25,7 @@ while (time.time() - start_time) < 10:
     recording = int(time.time())%2
     indicator_left = int(time.time())%2
     indicator_right = int(time.time())%2
-    cruise_control = int(time.time())%2
+    cruise_control = False #int(time.time())%2
     actual_swa = math.sin(i/10)*100
     predicted_swa = math.sin((i+13)/7)*100
     show_predicted_swa = int(time.time())%3
@@ -51,7 +51,7 @@ while (time.time() - start_time) < 10:
     gui.set_show_predicted_swa(show_predicted_swa)
     
     i+=1
-    time.sleep(0.05)
+    time.sleep(0.001)
 
 time.sleep(5)
 gui.stop_window()

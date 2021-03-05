@@ -33,7 +33,11 @@ class AutopilotGUI():
         self.predicted_swa = 0
         self.show_predicted_swa = True
         self.time_string = ""
-        self.fps = 0
+        self.gui_fps = 0
+        self.nn_fps = 0
+        self.cam_fps = 0
+        self.can_sps = 0
+        self.rec_queue_len = 0
         self.freespace = 0
         self.recording = False
         
@@ -43,7 +47,8 @@ class AutopilotGUI():
         self.last_frame_update = 0 # timestamp
         self.last_render_timestamp = 0
         
-        self.min_frame_time = 0.04 # s, Don't re-render until this time has passed
+        self.min_frame_time = 0.033 # s, Don't re-render until this time has passed
+        self.gui_thread = None
         
         package_directory = os.path.dirname(os.path.abspath(__file__))
         
@@ -83,6 +88,7 @@ class AutopilotGUI():
         
         
     def set_frame(self, frame):
+        
         self.frame = frame
         height, width, channels = frame.shape
         self.resolution = [width, height]
@@ -118,11 +124,35 @@ class AutopilotGUI():
     def get_resolution(self):
         return self.resolution
     
-    def set_fps(self, fps):
-        self.fps = fps
+    def set_gui_fps(self, fps):
+        self.gui_fps = fps
     
-    def get_fps(self):
-        return self.fps
+    def get_gui_fps(self):
+        return self.gui_fps
+        
+    def set_nn_fps(self, fps):
+        self.nn_fps = fps
+    
+    def get_nn_fps(self):
+        return self.nn_fps
+        
+    def set_cam_fps(self, fps):
+        self.cam_fps = fps
+    
+    def get_cam_fps(self):
+        return self.cam_fps
+        
+    def set_rec_queue_len(self, rec_queue_len):
+        self.rec_queue_len = rec_queue_len
+    
+    def get_rec_queue_len(self):
+        return self.rec_queue_len
+        
+    def set_can_sps(self, sps):
+        self.can_sps = sps
+    
+    def get_can_sps(self):
+        return self.can_sps
     
     def set_engaged(self, engaged):
         self.engaged = engaged
@@ -213,6 +243,7 @@ class AutopilotGUI():
             self.set_frame(self.get_dummy_frame())
             
         frame_out = self.get_frame().copy()
+        frame_out = cv2.cvtColor(frame_out, cv2.COLOR_RGB2BGR)
         
         if self.get_engaged():
             #self.render_engaged_border(frame_out)
@@ -226,7 +257,11 @@ class AutopilotGUI():
         self.render_time(frame_out)
         if self.get_recording():
             self.render_rec(frame_out)
-        self.render_fps(frame_out)
+        self.render_gui_fps(frame_out)
+        self.render_nn_fps(frame_out)
+        self.render_cam_fps(frame_out)
+        self.render_rec_queue_len(frame_out)
+        self.render_can_sps(frame_out)
         self.render_velocity(frame_out)
         self.render_freespace(frame_out)
         if self.get_indicator_left():
@@ -280,8 +315,8 @@ class AutopilotGUI():
         text_y = shadow_y #+ (shadow_bounds[1] - text_bounds[1])//2
 
         # add text centered on image
-        cv2.putText(frame, text, (shadow_x, shadow_y ), font, size, shadow_color, shadow_thickness)
-        cv2.putText(frame, text, (text_x, text_y ), font, size, text_color, text_thickness)
+        cv2.putText(frame, text, (shadow_x, shadow_y ), font, size, shadow_color, shadow_thickness, cv2.LINE_AA)
+        cv2.putText(frame, text, (text_x, text_y ), font, size, text_color, text_thickness, cv2.LINE_AA)
         
     
     def render_time(self, frame):
@@ -298,11 +333,38 @@ class AutopilotGUI():
         rel_pos = (0.05, 0.05)
         self.render_text(frame, text, rel_pos, size, text_color, shadow_color)
         
-    def render_fps(self, frame):
-        text = str(round(self.get_fps(), 1)) + " fps (GUI)"
+    def render_gui_fps(self, frame):
+        text = "GUI: {} fps".format(round(self.get_gui_fps(), 1))
         size = 0.8
         rel_pos = (1.0, 0.1)
         self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_nn_fps(self, frame):
+        text = "NN: {} fps".format(round(self.get_nn_fps(), 1))
+        size = 0.8
+        rel_pos = (1.0, 0.15)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_cam_fps(self, frame):
+        text = "Cam: {} fps".format(round(self.get_cam_fps(), 1))
+        size = 0.8
+        rel_pos = (1.0, 0.2)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_can_sps(self, frame):
+        text = "CAN: {} Hz".format(round(self.get_can_sps(), 1))
+        size = 0.8
+        rel_pos = (1.0, 0.25)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_rec_queue_len(self, frame):
+        text = "Rec buf: {}".format(self.get_rec_queue_len())
+        size = 0.8
+        rel_pos = (1.0, 0.3)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+        
+        
         
     def render_actual_swa(self, frame):
         text = str(round(self.get_actual_swa(), 1)) + " deg"
@@ -460,14 +522,14 @@ class AutopilotGUI():
             if fullscreen:
                 cv2.namedWindow("Autopilot GUI", cv2.WINDOW_FREERATIO)
                 cv2.setWindowProperty("Autopilot GUI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-            Thread(target=self.render_window, args=()).start()
+            self.gui_thread = Thread(target=self.render_window, args=()).start()
         return self
 
     def render_window(self):
         while not self.window_rendering_stopped:
             last_last_render_timestamp = self.last_render_timestamp
             self.last_render_timestamp = time.time()
-            self.set_fps(1/(self.last_render_timestamp - last_last_render_timestamp))
+            self.set_gui_fps(1/(self.last_render_timestamp - last_last_render_timestamp))
             start_time = time.time()
             self.render()
             end_time = time.time()
@@ -483,14 +545,17 @@ class AutopilotGUI():
             while (time.time() - self.last_render_timestamp) < self.min_frame_time:
                 if cv2.waitKey(1) == ord("q"):
                     self.window_rendering_stopped = True
+                    break
             
             while not self.get_updated():
                 if cv2.waitKey(1) == ord("q"):
                     self.window_rendering_stopped = True
+                    break
                     
                 if (time.time() - self.get_last_frame_update()) > 1:
                     # detect loss of video
                     self.set_frame(self.get_dummy_frame())
+                
                     
             
                     
@@ -498,6 +563,9 @@ class AutopilotGUI():
                 
     def stop_window(self):
         self.window_rendering_stopped = True
+        if not self.gui_thread is None:
+            self.gui_thread.join()
+            print("GUI render Thread finished")
         cv2.destroyAllWindows()
     
 
