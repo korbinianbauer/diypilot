@@ -272,15 +272,11 @@ def get_blinker(can_dict):
 
 # Load NN
 tf.config.list_physical_devices('GPU')
-<<<<<<< HEAD
+
 #model_name = 'diypilot_v9_small_FC_epoch_3'
 model_name = 'diypilot_v11_full_balance_epoch_10'
-loaded_model = keras.models.load_model('/home/jetson/diypilot/notebooks/trained_models/' + model_name + '.h5')
-loaded_model.summary()
-=======
-model_name = 'diypilot_v9_small_FC_epoch_3'
+
 loaded_model = keras.models.load_model('/home/jetson/diypilot/Jetson/autopilot/record/trained_models/' + model_name + '/trt/')
->>>>>>> master
 
 model_fn = loaded_model.signatures['serving_default']
 
