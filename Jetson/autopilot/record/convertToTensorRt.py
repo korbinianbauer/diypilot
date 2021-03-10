@@ -3,7 +3,7 @@ from tensorflow.python.compiler.tensorrt import trt_convert as trt
 import numpy as np
 
 # Get .h5 model
-model_name = 'diypilot_v9_small_FC_epoch_3'
+model_name = 'diypilot_v11_full_balance_epoch_3'
 loaded_model = keras.models.load_model('/home/jetson/diypilot/notebooks/trained_models/' + model_name + '.h5')
 loaded_model.summary()
 

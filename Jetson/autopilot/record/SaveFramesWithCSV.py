@@ -39,7 +39,7 @@ can_thread = None
 camera_thread = None
 sample_writer_thread = None
 
-demo_mode = False
+demo_mode = True
 min_frame_time = 0.066 # s, Don't re-run mainloop until this time has passed
 
 cam_fps = 0
@@ -133,6 +133,11 @@ def get_cam_frame():
         camera_frame = cv2.rotate(color_image, cv2.ROTATE_180)
         camera_frame_crop = crop_to_roi(camera_frame)
         
+        cv2.imshow('camera_frame_crop', camera_frame_crop)
+        print(camera_frame_crop)
+        if cv2.waitKey(1) == ord("q"):
+            break
+        
         image = np.asarray(camera_frame_crop).astype(np.float32)
         # The input needs to be a tensor, convert it using `tf.convert_to_tensor`.
         input_tensor = tf.convert_to_tensor(image)
@@ -207,7 +212,7 @@ def run_inference_for_single_image(model_fn):
   
 def get_swa_from_predictions(predictions):
     #print(predictions)
-    return tf.keras.backend.get_value(predictions['dense_1'])[0][0]*90
+    return tf.keras.backend.get_value(predictions['dense_2'])[0][0]*90
 
    
 def get_steering_wheel_angle(can_dict):
@@ -235,7 +240,7 @@ def get_speed(can_dict):
             print("V = " + str(speed) + "km/h")
             return speed
             
-    return -999
+    return 999
             
 def access_bit(data, num):
     base = int(num // 8)
@@ -271,7 +276,7 @@ def get_blinker(can_dict):
 tf.config.list_physical_devices('GPU')
 
 #model_name = 'diypilot_v9_small_FC_epoch_3'
-model_name = 'diypilot_v11_full_balance_epoch_10'
+model_name = 'diypilot_v11_full_balance_epoch_3'
 
 loaded_model = keras.models.load_model('/home/jetson/diypilot/Jetson/autopilot/record/trained_models/' + model_name + '/trt/')
 
