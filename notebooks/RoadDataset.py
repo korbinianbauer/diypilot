@@ -15,7 +15,12 @@ class RoadDataset(Sequence):
         self.csv_path = csv_path
         self.frames_path = frames_path
         self.column_names = column_names
-        self.csv = pd.read_csv(csv_path, names=column_names)
+        try:
+            print("Reading csv file: {}".format(csv_path))
+            self.csv = pd.read_csv(csv_path, names=column_names)
+        except:
+            print("Failed to read csv file!")
+            self.csv = pd.DataFrame(columns = column_names)
         self.batch_size = batch_size
         self.mode = mode
         self.indices = np.arange(len(self.csv))
@@ -26,7 +31,14 @@ class RoadDataset(Sequence):
         self.roi_x = 0
         self.roi_w = 848
         
+        self.some_prime = 131
+        self.shift_range = 100
+        self.shift_multiplier = 0.2 # degrees per pixel shift
+        
         print('Loaded dataset with ' + str(len(self.csv)) + ' samples')
+        
+    def set_shift_range(self, shift_range):
+        self.shift_range = shift_range
         
     def __len__(self):
         return int(math.floor(len(self.csv) / float(self.batch_size)))
@@ -36,9 +48,20 @@ class RoadDataset(Sequence):
     
     def on_epoch_end(self):
         # Shuffles indices after each epoch if in training mode
+        self.rebuild_indices()
+        #if self.mode == 'train':
+        #    self.indices = np.arange(len(self.csv))
+        #    np.random.shuffle(self.indices)
+            
+    def rebuild_indices(self):
+        self.indices = np.arange(len(self.csv))
         if self.mode == 'train':
-            self.indices = np.arange(len(self.csv))
+            #print("shuffling indices. Before:")
+            #print(self.indices)
             np.random.shuffle(self.indices)
+            #print("After:")
+            #print(self.indices)
+            
             
     def get_batch_labels(self, batch_index):
         # Fetch a batch of labels
@@ -49,7 +72,7 @@ class RoadDataset(Sequence):
         # Fetch a batch of inputs
         #sample_indices = range(batch_index * self.batch_size, (batch_index + 1) * self.batch_size)
         sample_indices = self.indices[(batch_index * self.batch_size):((batch_index + 1) * self.batch_size)]
-        return np.array([self.get_cropped_frame(sample_index)[0] for sample_index in sample_indices])
+        return np.array([self.get_cropped_frame(sample_index, shift = "random")[0] for sample_index in sample_indices])
 
     def __getitem__(self, batch_index):
         batch_x = self.get_batch_features(batch_index)
@@ -69,6 +92,17 @@ class RoadDataset(Sequence):
     def clean(self):
         csv = self.get_csv()
         print("Cleaning dataset. Starting with " + str(len(csv)) + " samples.")
+        
+        # Check if image files exist and are readable
+        #missing_idxs = []
+        #for idx in range(len(self)):
+        #    try:
+        #        self.get_frame(idx)
+        #    except:
+        #        missing_idxs.append(idx)
+        #        print(self.get_csv(idx))
+        #print("Removing " + str(len(missing_idxs)) + " rows for reason: Failed reading image file")
+        #csv = csv.drop(missing_idxs)
         
         # Remove Low speed samples
         low_speed_indices = csv[csv["speed"] < 25].index
@@ -94,6 +128,7 @@ class RoadDataset(Sequence):
         print(str(len(csv)) + " samples remaining.")
         
         self.csv = csv
+        self.rebuild_indices()
         
     def balance(self):
         csv = self.get_csv()
@@ -113,13 +148,15 @@ class RoadDataset(Sequence):
             idx_bins[i] = range_indices
             bin_counts.append(len(range_indices))
             
-        median_bin_count = int(np.median(bin_counts))
+        #median_bin_count = int(np.median(bin_counts))
+        median_bin_count = int(min(bin_counts))
             
         # Keep min_bin_sample_count samples in each bin, random sampling
         for i in range(len(idx_bins)):
             idx_bins[i] = random.sample(idx_bins[i], min(median_bin_count, len(idx_bins[i])))
         
-        #print(idx_bins)
+        print(bin_counts)
+        print(median_bin_count)
         
         balanced_indices = []
         for indices in idx_bins:
@@ -130,6 +167,7 @@ class RoadDataset(Sequence):
         
         print(str(len(balanced_csv)) + " samples remaining.")
         self.csv = balanced_csv
+        self.rebuild_indices()
         
     def normalize(self):
         
@@ -137,19 +175,32 @@ class RoadDataset(Sequence):
         self.csv["steering_wheel_angle"] /= 90.0
         
     def get_label(self, sample_index):
-        return self.get_csv(sample_index)['steering_wheel_angle']
+        original = self.get_csv(sample_index)['steering_wheel_angle']
+        shift = ((self.some_prime*sample_index) % (2*self.shift_range+1)) - self.shift_range
+        #print("Label: Random shift: {}px".format(shift))
+        shift *= self.shift_multiplier
+        #print("Label: Random shift: {}deg".format(shift))
+        shift /= 90
+        #print("Label: Random shift: {}units".format(shift))
+        
+        return original + shift
     
     def get_swa(self, sample_index):
         return self.get_label(sample_index)
     
-    def get_cropped_frame(self, index, shift = 0):
+    def get_cropped_frame(self, index, shift):
         img_arr, csv = self.get_frame(index)
         img_crop = self.crop_to_roi(img_arr)
         
-        if shift == 0:
+        if shift == None:
             return img_crop, csv
         
+        # If no explicit shift is given, apply "random" shift
         
+        if shift == "random":
+            shift = ((self.some_prime*index) % (2*self.shift_range+1)) - self.shift_range
+            #print("Image: Random shift: {}px".format(shift))
+            
         # Locate points of the documents or object which you want to transform
         # source:
         frame_width = self.roi_w
