@@ -26,8 +26,8 @@ class RoadDataset(Sequence):
         self.indices = np.arange(len(self.csv))
         
         # ROI
-        self.roi_y = 190
-        self.roi_h = 210
+        self.roi_y = 230
+        self.roi_h = 170
         self.roi_x = 0
         self.roi_w = 848
         
@@ -149,7 +149,8 @@ class RoadDataset(Sequence):
             bin_counts.append(len(range_indices))
             
         #median_bin_count = int(np.median(bin_counts))
-        median_bin_count = int(min(bin_counts))
+        #median_bin_count = int(min(bin_counts))
+        median_bin_count = int(np.sum(sorted(bin_counts)[:5]))
             
         # Keep min_bin_sample_count samples in each bin, random sampling
         for i in range(len(idx_bins)):
@@ -215,15 +216,17 @@ class RoadDataset(Sequence):
 
         # Apply Perspective Transform Algorithm 
         matrix = cv2.getPerspectiveTransform(pts1, pts2) 
-        result = cv2.warpPerspective(img_crop/255, matrix, (frame_width, frame_height), borderMode=cv2.BORDER_WRAP)
+        result = cv2.warpPerspective(img_crop/255., matrix, (frame_width, frame_height), borderMode=cv2.BORDER_WRAP)
         
-        return result*255, csv
+        cropped_frame = (result*255).astype(np.uint8)
+        
+        return cropped_frame, csv
         
     def get_frame(self, index):
         csv = self.get_csv(index)
         frame_path = self.frames_path + csv['filename']
         img = load_img(frame_path)
-        img_arr = img_to_array(img)
+        img_arr = img_to_array(img, dtype=np.uint8)
         
        
         
@@ -266,55 +269,10 @@ class RoadDataset(Sequence):
         
     @staticmethod
     def crop_to_roi(frame):
-        roi_y = 190
-        roi_h = 210
+        roi_y = 230
+        roi_h = 170
         roi_x = 0
         roi_w = 848
         crop_img = frame[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w].copy()
         return crop_img
         
-     
-    def get_frame_crop(self, index, shift=0):
-        frame, csv = self.get_frame(index)
-        frame = np.array(frame)
-        
-        # Locate points of the documents or object which you want to transform
-        # source:
-        frame_width = 848
-        frame_height = 480
-        src_top_width = 150
-        src_bottom_width = 1400
-        src_height = 210
-        src_bottom_crop = 60
-        src_pt1 = [frame_width/2 - src_top_width/2 + shift, frame_height-src_height-src_bottom_crop]
-        src_pt2 = [frame_width/2 + src_top_width/2 + shift, frame_height-src_height-src_bottom_crop]
-        src_pt3 = [frame_width/2 - src_bottom_width/2 + shift, frame_height-src_bottom_crop]
-        src_pt4 = [frame_width/2 + src_bottom_width/2 + shift, frame_height-src_bottom_crop]
-        
-        pts1 = np.float32([src_pt1, src_pt2, src_pt3, src_pt4]) 
-        
-        
-        dst_width = 100
-        dst_height = 200
-        pts2 = np.float32([[0, 0], [dst_width, 0], [0, dst_height], [dst_width, dst_height]])
-
-        # Apply Perspective Transform Algorithm 
-        matrix = cv2.getPerspectiveTransform(pts1, pts2) 
-        result = cv2.warpPerspective(frame, matrix, (dst_width, dst_height))
-        
-        # convert image from RGB to HSV
-        img_hsv = cv2.cvtColor(result, cv2.COLOR_RGB2HSV)
-        # Histogram equalisation on the V-channel
-        img_hsv[:, :, 2] = cv2.equalizeHist(img_hsv[:, :, 2])
-        # convert image back from HSV to RGB
-        image = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB)
-        
-        
-        # Add black areas to hide transform artefacts when adding shift
-        contours1 = np.array( [[0,170], [25,200], [0, 200]] )
-        cv2.fillPoly(image, pts =[contours1], color=(255,255,255))
-        contours1 = np.array( [[100,170], [75,200], [100, 200]] )
-        cv2.fillPoly(image, pts =[contours1], color=(255,255,255))
-        
-        
-        return image

@@ -54,15 +54,17 @@ def start_can_reader():
         return
     can_thread = Thread(target=read_can, args=()).start()
 
-def read_can(threadName):
+def read_can():
     global can_dict
     global can_sps
+    global bus
     last_can_time = time.time()
     while not stop_threads:
         if bus is None:
             os.system("sudo ip link set can0 up type can bitrate 33300")
             bus = can.interface.Bus('can0', bustype='socketcan')
         message = bus.recv()
+        #print(message)
         can_dict[message.arbitration_id] = message
         now = time.time()
         can_sps = 1/(now - last_can_time)
@@ -72,6 +74,8 @@ def read_can(threadName):
 
   
 start_can_reader()
+
+#time.sleep(60)
   
 camera_frame = []
 camera_frame_crop = []
@@ -108,7 +112,7 @@ def read_camera():
             color_sensor.set_option(rs.option.auto_exposure_priority, 0)
             color_sensor.set_option(rs.option.frames_queue_size, 1)
             
-            camera_thread = Thread(target=get_cam_frame, args=()).start()
+            camera_thread = Thread(target=get_cam_frame, args=(), name = "Camera Thread").start()
         return
         
 
@@ -127,7 +131,12 @@ def get_cam_frame():
         color_frame = frames.get_color_frame()
         color_image = np.asanyarray(color_frame.get_data())
         camera_frame = cv2.rotate(color_image, cv2.ROTATE_180)
-        camera_frame_crop = crop_to_roi(color_image)
+        camera_frame_crop = crop_to_roi(camera_frame)
+        
+        cv2.imshow('camera_frame_crop', camera_frame_crop)
+        print(camera_frame_crop)
+        if cv2.waitKey(1) == ord("q"):
+            break
         
         image = np.asarray(camera_frame_crop).astype(np.float32)
         # The input needs to be a tensor, convert it using `tf.convert_to_tensor`.
@@ -196,21 +205,14 @@ def write_sample_to_disk(record_dir, frame_dir):
 sample_writer()
         
 def run_inference_for_single_image(model_fn):
-  #image = np.asarray(image).astype(np.float32)
-  # The input needs to be a tensor, convert it using `tf.convert_to_tensor`.
-  #input_tensor = tf.convert_to_tensor(image)
-  # The model expects a batch of images, so add an axis with `tf.newaxis`.
-  #input_tensor = input_tensor[tf.newaxis,...]
-
   global frame_crop_tensor
   # Run inference
-  #model_fn = model.signatures['serving_default']
   return model_fn(frame_crop_tensor)
   
   
 def get_swa_from_predictions(predictions):
     #print(predictions)
-    return tf.keras.backend.get_value(predictions['dense_1'])[0][0]*90
+    return tf.keras.backend.get_value(predictions['dense_2'])[0][0]*90
 
    
 def get_steering_wheel_angle(can_dict):
@@ -238,7 +240,7 @@ def get_speed(can_dict):
             print("V = " + str(speed) + "km/h")
             return speed
             
-    return -999
+    return 999
             
 def access_bit(data, num):
     base = int(num // 8)
@@ -274,7 +276,7 @@ def get_blinker(can_dict):
 tf.config.list_physical_devices('GPU')
 
 #model_name = 'diypilot_v9_small_FC_epoch_3'
-model_name = 'diypilot_v11_full_balance_epoch_10'
+model_name = 'diypilot_v11_full_balance_epoch_3'
 
 loaded_model = keras.models.load_model('/home/jetson/diypilot/Jetson/autopilot/record/trained_models/' + model_name + '/trt/')
 
@@ -305,7 +307,7 @@ mainloop_fps_max = 0
 
 steady_frame_crop = camera_frame_crop[:]
 
-while (time.time() - starttime) < 20:
+while (time.time() - starttime) < 12000:
 
     
     
@@ -344,17 +346,13 @@ while (time.time() - starttime) < 20:
     
     collecting_values_done = time.time()
     
-    sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers
-    sample_to_disk_queue.append(sample)
     
-    
-        
-    #if (speed > 0):
-    #    gui.set_recording(True)
-    #    sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers
-    #    sample_to_disk_queue.append(sample)
-    #else:
-    #    gui.set_recording(False)
+    if (speed > 0):
+        gui.set_recording(True)
+        sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers
+        sample_to_disk_queue.append(sample)
+    else:
+        gui.set_recording(False)
         
     writing_to_disk_done = time.time()
     
@@ -362,7 +360,7 @@ while (time.time() - starttime) < 20:
     t = datetime.datetime.fromtimestamp(timestamp)
     s = t.strftime('%d.%m.%Y %H:%M %S.%f')[:-3]
     gui.set_timestring(s)
-   # 
+   
     gui.set_frame(camera_frame)
     gui.set_nn_fps(mainloop_fps)
     gui.set_cam_fps(cam_fps)
@@ -376,6 +374,8 @@ while (time.time() - starttime) < 20:
     gui.set_velocity(speed)
     
     gui_updating_stuff_done = time.time()
+    framecounter += 1
+    
     
     print("pre_inference : {}ms".format(round(1000*(inference_start-timestamp), 2)))
     
