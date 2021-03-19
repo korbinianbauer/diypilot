@@ -194,7 +194,7 @@ class RoadDataset(Sequence):
         img_crop = self.crop_to_roi(img_arr)
         
         if shift == None:
-            return img_crop, csv
+            shift = 0
         
         # If no explicit shift is given, apply "random" shift
         
@@ -219,6 +219,12 @@ class RoadDataset(Sequence):
         result = cv2.warpPerspective(img_crop/255., matrix, (frame_width, frame_height), borderMode=cv2.BORDER_WRAP)
         
         cropped_frame = (result*255).astype(np.uint8)
+        
+        # Add white areas to hide transform artefacts when adding shift
+        contours1 = np.array( [[0,0], [0,170], [100, 170]] )
+        cropped_frame = cv2.fillPoly(cropped_frame, pts =[contours1], color=(255,255,255))
+        contours1 = np.array( [[847,0], [847,170], [747, 170]] )
+        cropped_frame = cv2.fillPoly(cropped_frame, pts =[contours1], color=(255,255,255))
         
         return cropped_frame, csv
         
