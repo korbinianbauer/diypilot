@@ -41,6 +41,11 @@ class AutopilotGUI():
         self.freespace = 0
         self.recording = False
         
+        self.roi_y = 190
+        self.roi_h = 210
+        self.roi_x = 0
+        self.roi_w = 848
+        
         self.frame_out = None
         self.window_rendering_stopped = True
         self.updated = True
@@ -243,7 +248,7 @@ class AutopilotGUI():
             self.set_frame(self.get_dummy_frame())
             
         frame_out = self.get_frame().copy()
-        frame_out = cv2.cvtColor(frame_out, cv2.COLOR_RGB2BGR)
+        #frame_out = cv2.cvtColor(frame_out, cv2.COLOR_RGB2BGR)
         
         if self.get_engaged():
             #self.render_engaged_border(frame_out)
@@ -278,6 +283,7 @@ class AutopilotGUI():
         #self.render_steering_wheel(frame_out)
         self.render_actual_swa(frame_out)
         self.render_actual_path(frame_out)
+        self.render_roi(frame_out)
             
         
         
@@ -464,6 +470,13 @@ class AutopilotGUI():
         swa = self.get_predicted_swa()
         color = (0, 0, 255) 
         self.render_path(frame, swa, color)
+        
+    def render_roi(self, frame):
+        start_point = (self.roi_x, self.roi_y)
+        end_point = (self.roi_x + self.roi_w, self.roi_y + self.roi_h)
+        color = (255, 0, 0)
+        thickness = 2
+        image = cv2.rectangle(frame, start_point, end_point, color, thickness)
         
         
     def rotate_image(self, image, angle):

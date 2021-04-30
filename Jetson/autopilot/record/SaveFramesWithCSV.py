@@ -39,7 +39,7 @@ can_thread = None
 camera_thread = None
 sample_writer_thread = None
 
-demo_mode = True
+demo_mode = False
 min_frame_time = 0.066 # s, Don't re-run mainloop until this time has passed
 
 cam_fps = 0
@@ -54,15 +54,17 @@ def start_can_reader():
         return
     can_thread = Thread(target=read_can, args=()).start()
 
-def read_can(threadName):
+def read_can():
     global can_dict
     global can_sps
+    global bus
     last_can_time = time.time()
     while not stop_threads:
         if bus is None:
             os.system("sudo ip link set can0 up type can bitrate 33300")
             bus = can.interface.Bus('can0', bustype='socketcan')
         message = bus.recv()
+        #print(message)
         can_dict[message.arbitration_id] = message
         now = time.time()
         can_sps = 1/(now - last_can_time)
@@ -72,6 +74,8 @@ def read_can(threadName):
 
   
 start_can_reader()
+
+#time.sleep(60)
   
 camera_frame = []
 camera_frame_crop = []
@@ -86,7 +90,7 @@ def read_camera():
             # Configure depth and color streams
             pipeline = rs.pipeline()
             config = rs.config()
-            config.enable_stream(rs.stream.color, 848, 480, rs.format.bgr8, 15)
+            config.enable_stream(rs.stream.color, 848, 480, rs.format.bgr8, 30)
 
             # Start streaming
             profile = None
@@ -108,11 +112,19 @@ def read_camera():
             color_sensor.set_option(rs.option.auto_exposure_priority, 0)
             color_sensor.set_option(rs.option.frames_queue_size, 1)
             
-            camera_thread = Thread(target=get_cam_frame, args=()).start()
+            camera_thread = Thread(target=get_cam_frame, args=(), name = "Camera Thread").start()
         return
         
 
-    
+def load_dummy_frame():
+    global camera_frame_crop
+    global frame_crop_tensor
+    dummy_image = cv2.imread('frame1.jpg')
+    camera_frame_crop = crop_to_roi(dummy_image)
+    image = np.asarray(camera_frame_crop).astype(np.float32)
+    input_tensor = tf.convert_to_tensor(image)
+    frame_crop_tensor = input_tensor[tf.newaxis,...]
+       
         
 def get_cam_frame():
     global camera_frame
@@ -123,11 +135,20 @@ def get_cam_frame():
     
     last_frame_time = time.time()
     while not stop_threads:
-        frames = pipeline.wait_for_frames()
-        color_frame = frames.get_color_frame()
+        
+        try:
+            frames = pipeline.wait_for_frames()
+            color_frame = frames.get_color_frame()
+        except:
+            print("Failed to get frame from Camera")
         color_image = np.asanyarray(color_frame.get_data())
         camera_frame = cv2.rotate(color_image, cv2.ROTATE_180)
-        camera_frame_crop = crop_to_roi(color_image)
+        camera_frame_crop = crop_to_roi(camera_frame)
+        
+        #cv2.imshow('camera_frame_crop', camera_frame_crop)
+        #print(camera_frame_crop)
+        #if cv2.waitKey(1) == ord("q"):
+        #    break
         
         image = np.asarray(camera_frame_crop).astype(np.float32)
         # The input needs to be a tensor, convert it using `tf.convert_to_tensor`.
@@ -152,7 +173,8 @@ def crop_to_roi(frame):
         crop_img = frame[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w].copy()
         return crop_img
         
-read_camera()
+
+
 
 def stop_all_threads():
     global stop_threads
@@ -196,21 +218,14 @@ def write_sample_to_disk(record_dir, frame_dir):
 sample_writer()
         
 def run_inference_for_single_image(model_fn):
-  #image = np.asarray(image).astype(np.float32)
-  # The input needs to be a tensor, convert it using `tf.convert_to_tensor`.
-  #input_tensor = tf.convert_to_tensor(image)
-  # The model expects a batch of images, so add an axis with `tf.newaxis`.
-  #input_tensor = input_tensor[tf.newaxis,...]
-
   global frame_crop_tensor
   # Run inference
-  #model_fn = model.signatures['serving_default']
   return model_fn(frame_crop_tensor)
   
   
 def get_swa_from_predictions(predictions):
     #print(predictions)
-    return tf.keras.backend.get_value(predictions['dense_1'])[0][0]*90
+    return tf.keras.backend.get_value(predictions['dense_2'])[0][0]*90
 
    
 def get_steering_wheel_angle(can_dict):
@@ -222,7 +237,7 @@ def get_steering_wheel_angle(can_dict):
             #print("SWA:" + hex(arbitration_id) + ": " + str(binascii.hexlify(data)))
             reading = int.from_bytes(data[4:6], byteorder='big', signed=True)
             angle = round(reading*360/5750, 2)
-            print("SWA: " + str(angle) + "deg")
+            #print("SWA: " + str(angle) + "deg")
             return angle
             
     return -999
@@ -235,10 +250,10 @@ def get_speed(can_dict):
             data = message.data
             #print("Speed (km/h):" + hex(arbitration_id) + ": " + str(binascii.hexlify(data)))
             speed = int.from_bytes(data[4:6], byteorder='big', signed=True) * 0.031
-            print("V = " + str(speed) + "km/h")
+            #print("V = " + str(speed) + "km/h")
             return speed
             
-    return -999
+    return 999
             
 def access_bit(data, num):
     base = int(num // 8)
@@ -256,8 +271,8 @@ def get_blinker(can_dict):
             blinker_links = get_bitfield(data)[5]
             blinker_rechts = get_bitfield(data)[6]
             
-            print("Blink_L: " + str(blinker_links))
-            print("Blink_R: " + str(blinker_rechts))
+            #print("Blink_L: " + str(blinker_links))
+            #print("Blink_R: " + str(blinker_rechts))
             
             return [blinker_links, blinker_rechts]
             
@@ -272,17 +287,24 @@ def get_blinker(can_dict):
 
 # Load NN
 tf.config.list_physical_devices('GPU')
-model_name = 'diypilot_v9_small_FC_epoch_3'
+
+#model_name = 'diypilot_v9_small_FC_epoch_3'
+model_name = 'diypilot_v11_full_balance_epoch_3'
+
 loaded_model = keras.models.load_model('/home/jetson/diypilot/Jetson/autopilot/record/trained_models/' + model_name + '/trt/')
 
 model_fn = loaded_model.signatures['serving_default']
 
 
-# Run one frame through NN for warmup
+# Run dummy frame through NN for warmup
+load_dummy_frame()
 print("Running warmup")
 warmup_start = time.time()
 run_inference_for_single_image(model_fn)
 print("Warumup done ({}s)".format(round(time.time()-warmup_start, 2)))
+
+# Start real camera feed
+read_camera()
 
 yappi.start()
 
@@ -302,7 +324,7 @@ mainloop_fps_max = 0
 
 steady_frame_crop = camera_frame_crop[:]
 
-while (time.time() - starttime) < 20:
+while (time.time() - starttime) < 12000:
 
     
     
@@ -311,10 +333,15 @@ while (time.time() - starttime) < 20:
     mainloop_fps = 1/(timestamp - last_timestamp)
     last_timestamp = timestamp
     
-    print("\nMainloop fps: {}".format(round(mainloop_fps, 2)))
+    #print("\nMainloop fps: {}".format(round(mainloop_fps, 2)))
     
 
     # Run model
+    try:
+        camera_frame.shape
+    except:
+        continue
+    
     if ((480, 848, 3)!=camera_frame.shape):
         continue
     
@@ -341,17 +368,13 @@ while (time.time() - starttime) < 20:
     
     collecting_values_done = time.time()
     
-    sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers
-    sample_to_disk_queue.append(sample)
     
-    
-        
-    #if (speed > 0):
-    #    gui.set_recording(True)
-    #    sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers
-    #    sample_to_disk_queue.append(sample)
-    #else:
-    #    gui.set_recording(False)
+    if (speed > 0):
+        gui.set_recording(True)
+        sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers
+        sample_to_disk_queue.append(sample)
+    else:
+        gui.set_recording(False)
         
     writing_to_disk_done = time.time()
     
@@ -359,7 +382,7 @@ while (time.time() - starttime) < 20:
     t = datetime.datetime.fromtimestamp(timestamp)
     s = t.strftime('%d.%m.%Y %H:%M %S.%f')[:-3]
     gui.set_timestring(s)
-   # 
+   
     gui.set_frame(camera_frame)
     gui.set_nn_fps(mainloop_fps)
     gui.set_cam_fps(cam_fps)
@@ -373,24 +396,26 @@ while (time.time() - starttime) < 20:
     gui.set_velocity(speed)
     
     gui_updating_stuff_done = time.time()
+    framecounter += 1
     
-    print("pre_inference : {}ms".format(round(1000*(inference_start-timestamp), 2)))
     
-    print("run_inference_for_single_image() : {}ms".format(round(1000*(inference_done-inference_start), 2)))
+    #print("pre_inference : {}ms".format(round(1000*(inference_start-timestamp), 2)))
     
-    print("get_swa_from_predictions() : {}ms".format(round(1000*(prediction_extraction_done-inference_done), 2)))
+    #print("run_inference_for_single_image() : {}ms".format(round(1000*(inference_done-inference_start), 2)))
     
-    print("collecting_values_done : {}ms".format(round(1000*(collecting_values_done-prediction_extraction_done), 2)))
+    #print("get_swa_from_predictions() : {}ms".format(round(1000*(prediction_extraction_done-inference_done), 2)))
     
-    print("writing_to_disk : {}ms".format(round(1000*(writing_to_disk_done-collecting_values_done), 2)))
-    print("gui_updating_stuff_done : {}ms".format(round(1000*(gui_updating_stuff_done-writing_to_disk_done), 2)))
+    #print("collecting_values_done : {}ms".format(round(1000*(collecting_values_done-prediction_extraction_done), 2)))
     
-    print("sample_to_disk_queue length: {}".format(len(sample_to_disk_queue)))
+    #print("writing_to_disk : {}ms".format(round(1000*(writing_to_disk_done-collecting_values_done), 2)))
+    #print("gui_updating_stuff_done : {}ms".format(round(1000*(gui_updating_stuff_done-writing_to_disk_done), 2)))
+    
+    #print("sample_to_disk_queue length: {}".format(len(sample_to_disk_queue)))
     
     mainloop_done = time.time()
-    print("post_gui_stuff : {}ms".format(round(1000*(mainloop_done-gui_updating_stuff_done), 2)))
+    #print("post_gui_stuff : {}ms".format(round(1000*(mainloop_done-gui_updating_stuff_done), 2)))
     
-    print("Mainloop (incl prints) took: {}ms".format(round(1000*(mainloop_done-timestamp), 2)))
+    #print("Mainloop (incl prints) took: {}ms".format(round(1000*(mainloop_done-timestamp), 2)))
     
     while (time.time() - timestamp) < min_frame_time:
         time.sleep(0.001)
