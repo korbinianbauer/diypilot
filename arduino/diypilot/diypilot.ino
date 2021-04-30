@@ -30,15 +30,20 @@ void loop() {
     setMotSpeed(0);
     Serial.println("Timeout: Motor stopped.");
   }
+  Serial.print("{");
+  Serial.print("gps_valid:");
   Serial.print(getGpsValid());
   Serial.print(",");
 
+  Serial.print("gps_date:");
   Serial.print(getGpsYear());
   Serial.print("/");
   Serial.print(getGpsMonth());
   Serial.print("/");
   Serial.print(getGpsDay());
   Serial.print(",");
+
+  Serial.print("gps_time:");
   Serial.print(getGpsHour());
   Serial.print(":");
   Serial.print(getGpsMinute());
@@ -46,10 +51,15 @@ void loop() {
   Serial.print(getGpsSecond());
   Serial.print(",");
 
+  Serial.print("gps_lat:");
   Serial.print(getGpsLat(), 6);
   Serial.print(",");
+  
+  Serial.print("gps_long:");
   Serial.print(getGpsLong(), 6);
   Serial.print(",");
+
+  Serial.print("gps_vel:");
   Serial.println(getGpsSpeed(), 1);
   smartDelay(1000);
 }

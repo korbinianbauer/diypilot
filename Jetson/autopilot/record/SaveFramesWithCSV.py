@@ -81,11 +81,12 @@ def read_arduino():
     while not stop_threads:
         if bus is None:
             print("Connecting to Arduino")
-            arduino_connection = serial.Serial('/dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_55736303831351F03132-if00', 115200, timeout=1, write_timeout=1)
+            arduino_connection = serial.Serial('/dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0', 115200, timeout=1, write_timeout=1)
             
-        input = arduino_connection.readline()
+        input_string = arduino_connection.readline()
+        print(input_string)
         try:
-            antwort = eval(input)
+            antwort = eval(input_string)
             gps_lat = float(antwort["gps_lat"])
             gps_long = float(antwort["gps_long"])
             gps_sats = int(antwort["gps_sats"])
