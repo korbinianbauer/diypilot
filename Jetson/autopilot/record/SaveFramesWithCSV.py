@@ -22,6 +22,7 @@ import binascii
 import os
 import shutil 
 import _thread
+import serial
 
 from threading import Thread
 
@@ -47,6 +48,55 @@ can_sps = 0
 
 bus = None
 can_dict = {}
+
+arduino_connection = None
+arduino_out = ""
+arduino_in = ""
+
+gps_lat = 0
+gps_long = 0
+gps_sats = 0
+gps_vel = 0
+gps_date = None
+gps_time = None
+
+
+# Own thread that continuously receives from ans send to the Arduino
+
+def start_serial_reader():
+    if demo_mode:
+        return
+    serial_thread = Thread(target=read_arduino, args=()).start()
+
+def read_arduino():
+    global arduino_connection
+    
+    global gps_lat
+    global gps_long
+    global gps_sats
+    global gps_vel
+    global gps_date
+    global gps_time
+    
+    while not stop_threads:
+        if bus is None:
+            print("Connecting to Arduino")
+            arduino_connection = serial.Serial('/dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_55736303831351F03132-if00', 115200, timeout=1, write_timeout=1)
+            
+        input = arduino_connection.readline()
+        try:
+            antwort = eval(input)
+            gps_lat = float(antwort["gps_lat"])
+            gps_long = float(antwort["gps_long"])
+            gps_sats = int(antwort["gps_sats"])
+            gps_vel = float(antwort["gps_vel"])
+            gps_date = antwort["gps_date"]
+            gps_time = antwort["gps_time"]
+        except Exception as e:
+            print(e)
+            time.sleep(0.1)
+            
+start_serial_reader()
 
 # Own thread that continuously reads the CAN bus
 def start_can_reader():

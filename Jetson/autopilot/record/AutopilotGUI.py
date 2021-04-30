@@ -29,6 +29,7 @@ class AutopilotGUI():
         self.cruise_control = False
         self.cc_setpoint = 0
         self.velocity = 0
+        self.gps_velocity = 0
         self.actual_swa = 0
         self.predicted_swa = 0
         self.show_predicted_swa = True
@@ -40,6 +41,12 @@ class AutopilotGUI():
         self.rec_queue_len = 0
         self.freespace = 0
         self.recording = False
+        
+        self.mot_speed = 0
+        
+        self.gps_sats = 0
+        self.gps_lat = 0
+        self.gps_long = 0
         
         self.roi_y = 190
         self.roi_h = 210
@@ -228,6 +235,13 @@ class AutopilotGUI():
     
     def get_velocity(self):
         return self.velocity
+        
+    def set_gps_velocity(self, velocity):
+        self.gps_velocity = velocity
+        self.set_updated(True)
+    
+    def get_gps_velocity(self):
+        return self.gps_velocity
     
     def set_freespace(self, freespace):
         self.freespace = freespace
@@ -235,6 +249,36 @@ class AutopilotGUI():
     
     def get_freespace(self):
         return self.freespace
+        
+    def set_mot_speed(self, mot_speed):
+        self.mot_speed = mot_speed
+        self.set_updated(True)
+        
+    def get_mot_speed(self):
+        return self.mot_speed
+        
+    def set_gps_sats(self, gps_sats):
+        self.gps_sats = gps_sats
+        self.set_updated(True)
+        
+    def get_gps_sats(self):
+        return self.gps_sats
+        
+        
+    def set_gps_lat(self, gps_lat):
+        self.gps_lat = gps_lat
+        self.set_updated(True)
+        
+    def get_gps_lat(self):
+        return self.gps_lat
+        
+        
+    def set_gps_long(self, gps_long):
+        self.gps_long = gps_long
+        self.set_updated(True)
+        
+    def get_gps_long(self):
+        return self.gps_long
     
     def get_dummy_frame(self):
         dummy_frame = np.zeros((480,848,3), np.uint8)
@@ -268,6 +312,7 @@ class AutopilotGUI():
         self.render_rec_queue_len(frame_out)
         self.render_can_sps(frame_out)
         self.render_velocity(frame_out)
+        self.render_gps_velocity(frame_out)
         self.render_freespace(frame_out)
         if self.get_indicator_left():
             self.render_left_indicator(frame_out)
@@ -285,8 +330,10 @@ class AutopilotGUI():
         self.render_actual_path(frame_out)
         self.render_roi(frame_out)
             
+        self.render_mot_speed(frame_out)
         
-        
+        self.render_gps_lat(frame_out)
+        self.render_gps_long(frame_out)
         
         
         self.frame_out = frame_out
@@ -375,15 +422,27 @@ class AutopilotGUI():
     def render_actual_swa(self, frame):
         text = str(round(self.get_actual_swa(), 1)) + " deg"
         size = 0.8
+        rel_pos = (0.9, 0.9)
+        self.render_text(frame, text, rel_pos, size, hor_align = 0)
+        
+    def render_mot_speed(self, frame):
+        text = str(round(self.get_mot_speed(), 1)) + " deg"
+        size = 0.8
         rel_pos = (0.9, 0.95)
         self.render_text(frame, text, rel_pos, size, hor_align = 0)
         
     
         
     def render_velocity(self, frame):
-        text = str(round(self.get_velocity(), 1)) + " km/h"
+        text = "CAN: " + str(round(self.get_velocity(), 1)) + " km/h"
         size = 0.8
         rel_pos = (0.17, 0.95)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_gps_velocity(self, frame):
+        text = "GPS: " + str(round(self.get_gps_velocity(), 1)) + " km/h"
+        size = 0.8
+        rel_pos = (0.17, 0.9)
         self.render_text(frame, text, rel_pos, size, hor_align = 1)
         
     def render_freespace(self, frame):
@@ -391,6 +450,29 @@ class AutopilotGUI():
         size = 0.8
         rel_pos = (1.0, 0.04)
         self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+        
+    def render_gps_sats(self, frame):
+        text = "Sats: " + str(round(self.get_gps_sats(), 1))
+        size = 0.8
+        rel_pos = (0.17, 0.1)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_gps_lat(self, frame):
+        text = "Lat: " + str(round(self.get_gps_lat(), 1)) + "°"
+        size = 0.8
+        rel_pos = (0.17, 0.15)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+    def render_gps_long(self, frame):
+        text = "Lon: " + str(round(self.get_gps_long(), 1)) + "°"
+        size = 0.8
+        rel_pos = (0.17, 0.2)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        
+        
+        
+        
     
     def render_engaged_border(self, frame):
         position = (0.5, 0.05)
