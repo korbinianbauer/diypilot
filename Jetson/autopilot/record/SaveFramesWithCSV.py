@@ -41,7 +41,8 @@ camera_thread = None
 sample_writer_thread = None
 
 demo_mode = False
-min_frame_time = 0.066 # s, Don't re-run mainloop until this time has passed
+#min_frame_time = 0.066 # s, Don't re-run mainloop until this time has passed
+min_frame_time = 0.033 # s, Don't re-run mainloop until this time has passed
 
 cam_fps = 0
 can_sps = 0
@@ -53,6 +54,9 @@ arduino_connection = None
 arduino_out = ""
 arduino_in = ""
 
+swa_error = 0
+
+mot_speed_act = 0
 gps_lat = 0
 gps_long = 0
 gps_sats = 0
@@ -71,6 +75,7 @@ def start_serial_reader():
 def read_arduino():
     global arduino_connection
     
+    global mot_speed_act
     global gps_lat
     global gps_long
     global gps_sats
@@ -79,14 +84,17 @@ def read_arduino():
     global gps_time
     
     while not stop_threads:
-        if bus is None:
+        if arduino_connection is None:
             print("Connecting to Arduino")
             arduino_connection = serial.Serial('/dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0', 115200, timeout=1, write_timeout=1)
             
         input_string = arduino_connection.readline()
-        print(input_string)
+        #print(input_string)
         try:
             antwort = eval(input_string)
+            #print("Valid string received:")
+            #print(antwort)
+            mot_speed_act = int(antwort["mot_vel"])
             gps_lat = float(antwort["gps_lat"])
             gps_long = float(antwort["gps_long"])
             gps_sats = int(antwort["gps_sats"])
@@ -94,10 +102,38 @@ def read_arduino():
             gps_date = antwort["gps_date"]
             gps_time = antwort["gps_time"]
         except Exception as e:
-            print(e)
-            time.sleep(0.1)
+            #print(e)
+            #time.sleep(0.1)
+            pass
             
 start_serial_reader()
+
+
+def start_serial_writer():
+    if demo_mode:
+        return
+    serial_thread = Thread(target=send_arduino, args=()).start()
+
+def send_arduino():
+    while not stop_threads:
+        while arduino_connection is None:
+            time.sleep(0.1)
+        
+        mot_vel_setpoint = int(500*swa_error)
+        
+        max_vel = 10000
+        
+        if abs(mot_vel_setpoint) > max_vel:
+            mot_vel_setpoint = 0
+            
+            
+        cmd = "MOT," + f'{mot_vel_setpoint:06}' + ",END\n"
+        arduino_connection.write(cmd.encode())
+        print(cmd)
+        time.sleep(0.2)
+        
+start_serial_writer()
+#time.sleep(1000)
 
 # Own thread that continuously reads the CAN bus
 def start_can_reader():
@@ -304,7 +340,7 @@ def get_speed(can_dict):
             #print("V = " + str(speed) + "km/h")
             return speed
             
-    return 999
+    return -999
             
 def access_bit(data, num):
     base = int(num // 8)
@@ -420,10 +456,14 @@ while (time.time() - starttime) < 12000:
     collecting_values_done = time.time()
     
     
-    if (speed > 0):
+    swa_error = actual_swa_deg - predicted_swa
+    
+    
+    if (speed > 0) and (speed < 300):
         gui.set_recording(True)
-        sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers
-        sample_to_disk_queue.append(sample)
+        if framecounter%3 == 0:
+            sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers
+            sample_to_disk_queue.append(sample)
     else:
         gui.set_recording(False)
         
@@ -445,6 +485,12 @@ while (time.time() - starttime) < 12000:
     gui.set_indicator_left(blinkers[0])
     gui.set_indicator_right(blinkers[1])
     gui.set_velocity(speed)
+    
+    gui.set_mot_speed(mot_speed_act)
+    gui.set_gps_velocity(gps_vel)
+    gui.set_gps_sats(gps_sats)
+    gui.set_gps_lat(gps_lat)
+    gui.set_gps_long(gps_long)
     
     gui_updating_stuff_done = time.time()
     framecounter += 1

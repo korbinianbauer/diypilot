@@ -292,7 +292,7 @@ class AutopilotGUI():
             self.set_frame(self.get_dummy_frame())
             
         frame_out = self.get_frame().copy()
-        #frame_out = cv2.cvtColor(frame_out, cv2.COLOR_RGB2BGR)
+        frame_out = cv2.cvtColor(frame_out, cv2.COLOR_RGB2BGR)
         
         if self.get_engaged():
             #self.render_engaged_border(frame_out)
@@ -334,6 +334,7 @@ class AutopilotGUI():
         
         self.render_gps_lat(frame_out)
         self.render_gps_long(frame_out)
+        self.render_gps_sats(frame_out)
         
         
         self.frame_out = frame_out
@@ -346,8 +347,8 @@ class AutopilotGUI():
         height, width, channels = frame.shape
         size = width * size/1000
         
-        shadow_thickness = int(size*8)
-        text_thickness = int(size*3)
+        shadow_thickness = int(size*6)
+        text_thickness = int(size*2)
 
         # get boundaries of text
         shadow_bounds = cv2.getTextSize(text, font, size, shadow_thickness)[0]
@@ -383,8 +384,8 @@ class AutopilotGUI():
         text_color = (255,0,0)
         shadow_color = (0,0,0)
         size = 1.2
-        rel_pos = (0.05, 0.05)
-        self.render_text(frame, text, rel_pos, size, text_color, shadow_color)
+        rel_pos = (0.01, 0.05)
+        self.render_text(frame, text, rel_pos, size, text_color, shadow_color, hor_align = -1)
         
     def render_gui_fps(self, frame):
         text = "GUI: {} fps".format(round(self.get_gui_fps(), 1))
@@ -420,30 +421,30 @@ class AutopilotGUI():
         
         
     def render_actual_swa(self, frame):
-        text = str(round(self.get_actual_swa(), 1)) + " deg"
+        text = "Act. SWA: " + str(round(self.get_actual_swa(), 1)) + " deg"
         size = 0.8
-        rel_pos = (0.9, 0.9)
-        self.render_text(frame, text, rel_pos, size, hor_align = 0)
+        rel_pos = (1.0, 0.9)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
         
     def render_mot_speed(self, frame):
-        text = str(round(self.get_mot_speed(), 1)) + " deg"
+        text = str(round(self.get_mot_speed(), 1)) + " deg/s"
         size = 0.8
-        rel_pos = (0.9, 0.95)
-        self.render_text(frame, text, rel_pos, size, hor_align = 0)
+        rel_pos = (1.0, 0.95)
+        self.render_text(frame, text, rel_pos, size, hor_align = 1)
         
     
         
     def render_velocity(self, frame):
         text = "CAN: " + str(round(self.get_velocity(), 1)) + " km/h"
         size = 0.8
-        rel_pos = (0.17, 0.95)
-        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        rel_pos = (0.01, 0.95)
+        self.render_text(frame, text, rel_pos, size, hor_align = -1)
         
     def render_gps_velocity(self, frame):
         text = "GPS: " + str(round(self.get_gps_velocity(), 1)) + " km/h"
         size = 0.8
-        rel_pos = (0.17, 0.9)
-        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        rel_pos = (0.01, 0.9)
+        self.render_text(frame, text, rel_pos, size, hor_align = -1)
         
     def render_freespace(self, frame):
         text = str(round(self.get_freespace(), 2)) + " GB free"
@@ -453,22 +454,22 @@ class AutopilotGUI():
         
         
     def render_gps_sats(self, frame):
-        text = "Sats: " + str(round(self.get_gps_sats(), 1))
+        text = "Sats: " + str(self.get_gps_sats())
         size = 0.8
-        rel_pos = (0.17, 0.1)
-        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        rel_pos = (0.01, 0.22)
+        self.render_text(frame, text, rel_pos, size, hor_align = -1)
         
     def render_gps_lat(self, frame):
-        text = "Lat: " + str(round(self.get_gps_lat(), 1)) + "°"
+        text = "Lat: " + str(round(self.get_gps_lat(), 6))
         size = 0.8
-        rel_pos = (0.17, 0.15)
-        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        rel_pos = (0.01, 0.12)
+        self.render_text(frame, text, rel_pos, size, hor_align = -1)
         
     def render_gps_long(self, frame):
-        text = "Lon: " + str(round(self.get_gps_long(), 1)) + "°"
+        text = "Lon: " + str(round(self.get_gps_long(), 6))
         size = 0.8
-        rel_pos = (0.17, 0.2)
-        self.render_text(frame, text, rel_pos, size, hor_align = 1)
+        rel_pos = (0.01, 0.17)
+        self.render_text(frame, text, rel_pos, size, hor_align = -1)
         
         
         
