@@ -48,10 +48,10 @@ class AutopilotGUI():
         self.gps_lat = 0
         self.gps_long = 0
         
-        self.roi_y = 190
-        self.roi_h = 210
-        self.roi_x = 0
-        self.roi_w = 848
+        self.roi_y = 230
+        self.roi_h = 170
+        self.roi_x = 104
+        self.roi_w = 640
         
         self.frame_out = None
         self.window_rendering_stopped = True

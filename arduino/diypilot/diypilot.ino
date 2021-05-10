@@ -2,6 +2,7 @@
 //#include <SoftwareSerial.h>
 //#include <AltSoftSerial.h>
 #include <NeoSWSerial.h> 
+#include "Streaming.h"
 
 #define MOT_DIR_PIN 5
 #define MOT_STEP_PIN 2
@@ -31,36 +32,52 @@ void loop() {
     Serial.println("Timeout: Motor stopped.");
   }
   Serial.print("{");
-  Serial.print("gps_valid:");
+  Serial.print("'gps_valid': ");
   Serial.print(getGpsValid());
   Serial.print(",");
 
-  Serial.print("gps_date:");
+  Serial.print("'gps_date': '");
   Serial.print(getGpsYear());
   Serial.print("/");
   Serial.print(getGpsMonth());
   Serial.print("/");
   Serial.print(getGpsDay());
-  Serial.print(",");
+  Serial.print("',");
 
-  Serial.print("gps_time:");
+  Serial.print("'gps_time': '");
   Serial.print(getGpsHour());
-  Serial.print(":");
+  Serial.print("/");
   Serial.print(getGpsMinute());
-  Serial.print(":");
+  Serial.print("/");
   Serial.print(getGpsSecond());
-  Serial.print(",");
+  Serial.print("',");
 
-  Serial.print("gps_lat:");
+  Serial.print("'gps_lat': ");
   Serial.print(getGpsLat(), 6);
   Serial.print(",");
   
-  Serial.print("gps_long:");
+  Serial.print("'gps_long': ");
   Serial.print(getGpsLong(), 6);
   Serial.print(",");
 
-  Serial.print("gps_vel:");
-  Serial.println(getGpsSpeed(), 1);
+  Serial.print("'gps_vel': ");
+  Serial.print(getGpsSpeed(), 1);
+  Serial.print(",");
+
+  Serial.print("'gps_sats': ");
+  Serial.print(getGpsSats());
+
+  Serial.println("}");
+
+//Serial << "{"; // Start python dictionary string
+//
+//Serial << "'gps_valid': " << getGpsValid(); // Time entry in milliseconds
+//Serial << ", 'gps_date': " << 6767;
+//Serial << ", 'Right_wheel_dist': " << 767;
+//Serial << ", 'IMU_roll': " << 87888;
+//
+//Serial << "}\n"; // Close python dictionary string
+//      
   smartDelay(1000);
 }
 
@@ -106,6 +123,9 @@ int getGpsMinute() {
 float getGpsSecond() {
   return gps.time.second();
 }
+int getGpsSats(){
+  return gps.satellites.value();
+}
 
 
 
@@ -137,3 +157,4 @@ static void smartDelay(unsigned long ms)
     serial_cmds = "";
   } while (millis() - start < ms);
 }
+
