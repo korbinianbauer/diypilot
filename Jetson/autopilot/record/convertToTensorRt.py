@@ -3,7 +3,7 @@ from tensorflow.python.compiler.tensorrt import trt_convert as trt
 import numpy as np
 
 # Get .h5 model
-model_name = 'diypilot_v11_full_balance_epoch_3'
+model_name = 'v17.1_epoch_13'
 loaded_model = keras.models.load_model('/home/jetson/diypilot/notebooks/trained_models/' + model_name + '.h5')
 loaded_model.summary()
 
@@ -26,8 +26,9 @@ converter.convert()
 
 def my_input_fn():
   # Input for a single inference call, for a network that has two input tensors:
-  inp1 = np.random.normal(size=(1, 210, 848, 3)).astype(np.float32)
-  yield [inp1]
+  inp1 = np.random.normal(size=(1, 170, 640, 3)).astype(np.float32)
+  inp2 = np.random.normal(size=(1, 1)).astype(np.float32)
+  yield [inp1, inp2]
     
 converter.build(input_fn=my_input_fn)
 converter.save(output_saved_model_dir)
