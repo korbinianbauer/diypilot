@@ -64,6 +64,23 @@ gps_vel = 0
 gps_date = None
 gps_time = None
 
+def denormalize_swa(swa_norm):
+        swa = revert_signed_log([swa_norm*4], 2)[0]
+        swa_deg = swa
+        return swa_deg
+    
+def revert_signed_log(arr, zero_gap):
+    arr2 = []
+    for x in arr:
+        if x < 0:
+            x -= np.log(zero_gap)
+            x = -np.exp(abs(x))+zero_gap
+        else:
+            x += np.log(zero_gap)
+            x = np.exp(abs(x))-zero_gap
+            arr2.append(x)
+    return np.array(arr2)
+
 
 # Own thread that continuously receives from ans send to the Arduino
 
@@ -166,7 +183,7 @@ start_can_reader()
   
 camera_frame = []
 camera_frame_crop = []
-frame_crop_tensor = None
+NN_input_tensor = None
 
 pipeline = None
 # Own thread that continuously reads the camera frame
@@ -205,18 +222,20 @@ def read_camera():
 
 def load_dummy_frame():
     global camera_frame_crop
-    global frame_crop_tensor
+    global NN_input_tensor
     dummy_image = cv2.imread('frame1.jpg')
     camera_frame_crop = crop_to_roi(dummy_image)
     image = np.asarray(camera_frame_crop).astype(np.float32)
-    input_tensor = tf.convert_to_tensor(image)
-    frame_crop_tensor = input_tensor[tf.newaxis,...]
+    v_vehicle = 50
+    v_vehicle = np.asarray(v_vehicle)
+    input_tensor = tf.convert_to_tensor([image, v_vehicle])
+    NN_input_tensor = input_tensor[tf.newaxis,...]
        
         
 def get_cam_frame():
     global camera_frame
     global camera_frame_crop
-    global frame_crop_tensor
+    global NN_input_tensor
     global pipeline
     global cam_fps
     
@@ -238,10 +257,12 @@ def get_cam_frame():
         #    break
         
         image = np.asarray(camera_frame_crop).astype(np.float32)
+        v_vehicle = get_speed(can_dict)
+        v_vehicle = np.asarray(v_vehicle)/250
         # The input needs to be a tensor, convert it using `tf.convert_to_tensor`.
-        input_tensor = tf.convert_to_tensor(image)
+        input_tensor = tf.convert_to_tensor([image, v_vehicle])
         # The model expects a batch of images, so add an axis with `tf.newaxis`.
-        frame_crop_tensor = input_tensor[tf.newaxis,...]
+        NN_input_tensor = input_tensor[tf.newaxis,...]
         now = time.time()
         cam_fps = 1/(now - last_frame_time)
         #print("Shape :{}".format(camera_frame.shape))
@@ -305,9 +326,9 @@ def write_sample_to_disk(record_dir, frame_dir):
 sample_writer()
         
 def run_inference_for_single_image(model_fn):
-  global frame_crop_tensor
+  global NN_input_tensor
   # Run inference
-  return model_fn(frame_crop_tensor)
+  return model_fn(NN_input_tensor)
   
   
 def get_swa_from_predictions(predictions):
@@ -376,7 +397,8 @@ def get_blinker(can_dict):
 tf.config.list_physical_devices('GPU')
 
 #model_name = 'diypilot_v9_small_FC_epoch_3'
-model_name = 'diypilot_v11_full_balance_epoch_3'
+#model_name = 'diypilot_v11_full_balance_epoch_3'
+model_name = 'v17.1_epoch_13'
 
 loaded_model = keras.models.load_model('/home/jetson/diypilot/Jetson/autopilot/record/trained_models/' + model_name + '/trt/')
 
@@ -388,7 +410,7 @@ load_dummy_frame()
 print("Running warmup")
 warmup_start = time.time()
 run_inference_for_single_image(model_fn)
-print("Warumup done ({}s)".format(round(time.time()-warmup_start, 2)))
+print("Warmup done ({}s)".format(round(time.time()-warmup_start, 2)))
 
 # Start real camera feed
 read_camera()
@@ -439,7 +461,8 @@ while (time.time() - starttime) < 12000:
     inference_start = time.time()
     predictions = run_inference_for_single_image(model_fn)
     inference_done = time.time()
-    predicted_swa = get_swa_from_predictions(predictions)
+    normed_predicted_swa = get_swa_from_predictions(predictions)
+    predicted_swa = denormalize_swa(normed_predicted_swa)
     prediction_extraction_done = time.time()
     
     
