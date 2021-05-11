@@ -75,6 +75,7 @@ def revert_signed_log(arr, zero_gap):
         if x < 0:
             x -= np.log(zero_gap)
             x = -np.exp(abs(x))+zero_gap
+            arr2.append(x)
         else:
             x += np.log(zero_gap)
             x = np.exp(abs(x))-zero_gap
@@ -146,7 +147,7 @@ def send_arduino():
             
         cmd = "MOT," + f'{mot_vel_setpoint:06}' + ",END\n"
         arduino_connection.write(cmd.encode())
-        print(cmd)
+        #print(cmd)
         time.sleep(0.2)
         
 start_serial_writer()
@@ -226,9 +227,7 @@ def load_dummy_frame():
     dummy_image = cv2.imread('frame1.jpg')
     camera_frame_crop = crop_to_roi(dummy_image)
     image = np.asarray(camera_frame_crop).astype(np.float32)
-    v_vehicle = 50
-    v_vehicle = np.asarray(v_vehicle)
-    input_tensor = tf.convert_to_tensor([image, v_vehicle])
+    input_tensor = tf.convert_to_tensor(image)
     NN_input_tensor = input_tensor[tf.newaxis,...]
        
         
@@ -257,10 +256,8 @@ def get_cam_frame():
         #    break
         
         image = np.asarray(camera_frame_crop).astype(np.float32)
-        v_vehicle = get_speed(can_dict)
-        v_vehicle = np.asarray(v_vehicle)/250
         # The input needs to be a tensor, convert it using `tf.convert_to_tensor`.
-        input_tensor = tf.convert_to_tensor([image, v_vehicle])
+        input_tensor = tf.convert_to_tensor(image)
         # The model expects a batch of images, so add an axis with `tf.newaxis`.
         NN_input_tensor = input_tensor[tf.newaxis,...]
         now = time.time()
@@ -274,10 +271,10 @@ def get_cam_frame():
     
    
 def crop_to_roi(frame):
-        roi_y = 190
-        roi_h = 210
-        roi_x = 0
-        roi_w = 848
+        roi_y = 230
+        roi_h = 170
+        roi_x = 104
+        roi_w = 640
         crop_img = frame[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w].copy()
         return crop_img
         
@@ -327,13 +324,18 @@ sample_writer()
         
 def run_inference_for_single_image(model_fn):
   global NN_input_tensor
+  
+  v_vehicle = get_speed(can_dict)/250
+  v_vehicle = np.asarray(v_vehicle).astype(np.float32)
+  v_vehicle_tensor = tf.convert_to_tensor([v_vehicle])
+  v_vehicle_tensor = v_vehicle_tensor[tf.newaxis,...]
   # Run inference
-  return model_fn(NN_input_tensor)
+  return model_fn(input_1=NN_input_tensor, input_2=v_vehicle_tensor)
   
   
 def get_swa_from_predictions(predictions):
     #print(predictions)
-    return tf.keras.backend.get_value(predictions['dense_2'])[0][0]*90
+    return tf.keras.backend.get_value(predictions['dense_3'])[0][0]
 
    
 def get_steering_wheel_angle(can_dict):
@@ -454,7 +456,7 @@ while (time.time() - starttime) < 12000:
     if ((480, 848, 3)!=camera_frame.shape):
         continue
     
-    if ((210, 848, 3)!=camera_frame_crop.shape):
+    if ((170, 640, 3)!=camera_frame_crop.shape):
         continue
         
     predicted_swa = 0
@@ -478,7 +480,8 @@ while (time.time() - starttime) < 12000:
     collecting_values_done = time.time()
     
     
-    swa_error = actual_swa_deg - predicted_swa
+    new_swa_error = actual_swa_deg - predicted_swa
+    swa_error = 0.8*swa_error + 0.2*new_swa_error
     
     
     if (speed > 0) and (abs(speed) < 300):
