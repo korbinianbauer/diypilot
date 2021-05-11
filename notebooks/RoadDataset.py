@@ -35,6 +35,7 @@ class RoadDataset(Sequence):
         
         # Camera
         self.frame_hor_fov_deg = 69 # degree
+        self.latency_compensation_frames = 3 # frames
         
         # ROI
         self.roi_y = 230
@@ -68,8 +69,7 @@ class RoadDataset(Sequence):
             
             sample_index = random.randint(0, len(self.csv)-1)
             #sample_index = 100
-            #sample = self.get_sample(sample_index, augment=True, crop=True, normalize=True)
-            sample = self.get_sample(sample_index, augment=False, crop=True, normalize=True)
+            sample = self.get_sample(sample_index, augment=True, crop=True, normalize=True)
             frame = sample['frame']
             v_vehicle = sample['v_vehicle']
             swa = sample['swa']
@@ -180,6 +180,14 @@ class RoadDataset(Sequence):
         #    print(csv["steering_wheel_angle"])
         #    #for swa in csv["steering_wheel_angle"]:
         #    #    print(swa)
+        
+        
+        # shift frames down to compensate for camera lag
+        
+        csv['filename'] = csv['filename'].shift(self.latency_compensation_frames, fill_value = "No frame")
+        no_frame_indices = csv[csv["filename"] == "No frame"].index
+        print("Removing " + str(len(no_frame_indices)) + " rows for reason: No frame after cam latency compensation")
+        csv = csv.drop(no_frame_indices)
         
         # Remove Low speed samples
         low_speed_indices = csv[csv["speed"] < 25].index

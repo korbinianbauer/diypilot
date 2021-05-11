@@ -27,7 +27,7 @@ class MultiRoadDataset(Sequence):
         #    print(swa)
         
     def __len__(self):
-        return 500
+        #return 500
         total_len = 0
         for dataset in self.datasets:
             total_len += len(dataset)

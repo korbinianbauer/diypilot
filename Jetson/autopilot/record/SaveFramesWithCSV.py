@@ -470,7 +470,6 @@ while (time.time() - starttime) < 12000:
 
     # Save frames to file and values to csv
     color_frame_filename = str(framecounter).zfill(7) + "_" + str(timestamp) + '.jpg'
-    #os.system('clear')
     actual_swa_deg = get_steering_wheel_angle(can_dict)
     speed = get_speed(can_dict)
     blinkers = get_blinker(can_dict)
@@ -482,9 +481,9 @@ while (time.time() - starttime) < 12000:
     swa_error = actual_swa_deg - predicted_swa
     
     
-    if (speed > 0) and (speed < 300):
+    if (speed > 0) and (abs(speed) < 300):
         gui.set_recording(True)
-        if framecounter%3 == 0:
+        if framecounter%2 == 0:
             sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers
             sample_to_disk_queue.append(sample)
     else:
