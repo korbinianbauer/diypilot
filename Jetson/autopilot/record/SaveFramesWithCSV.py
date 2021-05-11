@@ -309,8 +309,8 @@ def write_sample_to_disk(record_dir, frame_dir):
         while sample_to_disk_queue or not stop_threads:
             if sample_to_disk_queue:
                 sample = sample_to_disk_queue.popleft() # get oldest sample
-                color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers = sample
-                csvwriter.writerow([color_frame_filename, actual_swa_deg, speed, blinkers[0], blinkers[1]])
+                color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers, gps_lat, gps_long, gps_vel, gps_sats, predicted_swa = sample
+                csvwriter.writerow([color_frame_filename, actual_swa_deg, speed, blinkers[0], blinkers[1], gps_lat, gps_long, gps_vel, gps_sats, predicted_swa])
                 cv2.imwrite(frame_dir + color_frame_filename, camera_frame)
 
 
@@ -487,7 +487,7 @@ while (time.time() - starttime) < 12000:
     if (speed > 0) and (abs(speed) < 300):
         gui.set_recording(True)
         if framecounter%2 == 0:
-            sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers
+            sample = color_frame_filename, camera_frame, actual_swa_deg, speed, blinkers, gps_lat, gps_long, gps_vel, gps_sats, predicted_swa
             sample_to_disk_queue.append(sample)
     else:
         gui.set_recording(False)
