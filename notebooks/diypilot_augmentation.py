@@ -5,6 +5,11 @@ import random
 import numpy as np
 import cv2
 
+def horizontal_flip_augmentation(frame, orig_swa):
+    frame = cv2.flip(frame, 1)
+    new_swa = -orig_swa
+    
+    return frame, new_swa
 
 
 def horizontal_rotation_augmentation(frame, orig_swa, frame_hor_fov_deg, v_vehicle, time_to_recover, turn_radius, max_swa, hor_rotate_degrees, verbose=False):
@@ -35,6 +40,9 @@ def horizontal_rotation_augmentation(frame, orig_swa, frame_hor_fov_deg, v_vehic
         
         hor_rotate_rad = hor_rotate_degrees/180*3.141592
         w_aug = hor_rotate_rad / time_to_recover
+        
+        if v_vehicle < 0.1: # avoid div by r1=zero error
+            v_vehicle = 0.1
         
         w_new = w0 + w_aug
         r1 = v_vehicle / w_new

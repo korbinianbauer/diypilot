@@ -9,7 +9,7 @@ from IPython.display import Image, display, clear_output
 import seaborn as sns
 import random
 
-from diypilot_augmentation import lateral_shift_augmentation, horizontal_rotation_augmentation
+from diypilot_augmentation import lateral_shift_augmentation, horizontal_rotation_augmentation, horizontal_flip_augmentation
 
 class RoadDataset(Sequence):
     
@@ -124,7 +124,7 @@ class RoadDataset(Sequence):
         return sample
         
         
-    def augment_sample(self, frame, orig_swa, v_vehicle, lateral_shift=None, hor_rotation=None):
+    def augment_sample(self, frame, orig_swa, v_vehicle, lateral_shift=None, hor_rotation=None, flip=False):
         
         time_to_center = 2 # seconds
         frame_physical_width = 1450.0/1088.0*5.0 # meter
@@ -142,6 +142,13 @@ class RoadDataset(Sequence):
             hor_rotation = random.uniform(-self.hor_rotation_range, self.hor_rotation_range)
             
         frame, swa = horizontal_rotation_augmentation(frame, swa, self.frame_hor_fov_deg, v_vehicle, time_to_recover, self.vehicle_turn_radius, self.vehicle_max_swa, hor_rotation, verbose=False)
+        
+        do_flip = False
+        if flip:
+            do_flip = random.randint(0,1)
+            
+        if do_flip:
+            frame, swa = horizontal_flip_augmentation(frame, swa)
         
         return frame, swa
     
@@ -170,24 +177,28 @@ class RoadDataset(Sequence):
         #print("Removing " + str(len(missing_idxs)) + " rows for reason: Failed reading image file")
         #csv = csv.drop(missing_idxs)
         
-        ## Remove samples whre swa is NaN
-        #try:
-        #    swa_nan_indices = csv[np.isnan(csv["steering_wheel_angle"])].index
-        #    print("Removing " + str(len(swa_nan_indices)) + " rows for reason: SWA is NaN")
-        #    csv = csv.drop(swa_nan_indices)
-        #except:
-        #    print("Failed dropping swa NaN")
-        #    print(csv["steering_wheel_angle"])
-        #    #for swa in csv["steering_wheel_angle"]:
-        #    #    print(swa)
+        # Remove samples whre swa is NaN
+        try:
+            len_before = len(csv)
+            csv = csv.dropna(subset=["steering_wheel_angle"])
+            print("Removing " + str(len_before - len(csv)) + " rows for reason: SWA is NaN")
+
+        except:
+            print("Failed dropping swa NaN")
+            print(swa_nan_indices)
+            #for swa in csv["steering_wheel_angle"]:
+            #    print(swa)
         
         
         # shift frames down to compensate for camera lag
         
+        #print(csv)
         csv['filename'] = csv['filename'].shift(self.latency_compensation_frames, fill_value = "No frame")
+        #print(csv)
         no_frame_indices = csv[csv["filename"] == "No frame"].index
         print("Removing " + str(len(no_frame_indices)) + " rows for reason: No frame after cam latency compensation")
         csv = csv.drop(no_frame_indices)
+        #print(csv)
         
         
         # Remove high Steering wheel angle samples
@@ -283,12 +294,15 @@ class RoadDataset(Sequence):
         arr2 = []
         for x in arr:
             if x < 0:
-                x = -np.log(abs(x-zero_gap))
-                x += np.log(zero_gap)
+                y = -np.log(abs(x-zero_gap))
+                y += np.log(zero_gap)
             else:
-                x = np.log(abs(x+zero_gap))
-                x -= np.log(zero_gap)
-            arr2.append(x)
+                y = np.log(abs(x+zero_gap))
+                y -= np.log(zero_gap)
+            arr2.append(y)
+            
+            if np.isnan(y):
+                print("NaN after normalization! swa input: {}".format(x))
         return np.array(arr2)
 
     def revert_signed_log(self, arr, zero_gap):

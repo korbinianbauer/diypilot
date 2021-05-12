@@ -130,7 +130,7 @@ class MultiRoadDataset(Sequence):
         ma_norm_swas = []
         for dataset in self.datasets:
             dataset_ma_norm_swa = dataset.get_mean_absolute_normalized_swa()
-            print("Dataset dataset_ma_norm_swa: {}".format(dataset_ma_norm_swa))
+            #print("Dataset dataset_ma_norm_swa: {}".format(dataset_ma_norm_swa))
             if np.isnan(dataset_ma_norm_swa):
                 print(dataset.get_csv().describe())
             ma_norm_swas.append(dataset_ma_norm_swa)
