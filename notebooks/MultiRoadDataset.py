@@ -126,10 +126,6 @@ class MultiRoadDataset(Sequence):
     def get_csv(self):
         return pd.concat([dataset.get_csv()  for dataset in self.datasets])
     
-    def get_mean_absolute_swa(self):
-        swas = self.get_csv()['steering_wheel_angle']
-        return np.mean(abs(swas))/90
-    
     def get_mean_absolute_normalized_swa(self):
         ma_norm_swas = []
         for dataset in self.datasets:

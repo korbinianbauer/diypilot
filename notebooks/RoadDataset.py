@@ -189,17 +189,19 @@ class RoadDataset(Sequence):
         print("Removing " + str(len(no_frame_indices)) + " rows for reason: No frame after cam latency compensation")
         csv = csv.drop(no_frame_indices)
         
+        
+        # Remove high Steering wheel angle samples
+        high_neg_swa_indices = csv[csv["steering_wheel_angle"] < -180].index
+        high_pos_swa_indices = csv[csv["steering_wheel_angle"] > 180].index
+        print("Removing " + str(len(high_neg_swa_indices) + len(high_pos_swa_indices)) + " rows for reason: High SWA (> +180/ < -180 deg)")
+        csv = csv.drop(high_neg_swa_indices)
+        csv = csv.drop(high_pos_swa_indices)
+        
         # Remove Low speed samples
         low_speed_indices = csv[csv["speed"] < 25].index
         print("Removing " + str(len(low_speed_indices)) + " rows for reason: Low speed (< 25 km/h)")
         csv = csv.drop(low_speed_indices)
         
-        # Remove high Steering wheel angle samples
-        high_neg_swa_indices = csv[csv["steering_wheel_angle"] < -45].index
-        high_pos_swa_indices = csv[csv["steering_wheel_angle"] > 45].index
-        print("Removing " + str(len(high_neg_swa_indices) + len(high_pos_swa_indices)) + " rows for reason: High SWA (> +45/ < -45 deg)")
-        csv = csv.drop(high_neg_swa_indices)
-        csv = csv.drop(high_pos_swa_indices)
         
         # Remove samples with blinker on
         blink_left_indices = csv[csv["blink_l"] == 1].index
