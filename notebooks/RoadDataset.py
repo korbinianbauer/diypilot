@@ -124,25 +124,36 @@ class RoadDataset(Sequence):
         return sample
         
         
-    def augment_sample(self, frame, orig_swa, v_vehicle, lateral_shift=None, hor_rotation=None, flip=False):
+    def augment_sample(self, frame, orig_swa, v_vehicle, lateral_shift=None, hor_rotation=None, flip=False, aug_velocity=True):
         
         time_to_center = 2 # seconds
         frame_physical_width = 1450.0/1088.0*5.0 # meter
         
         swa = orig_swa
         
+        # Spread velocity
+        if aug_velocity:
+            v_vehicle = random.triangular(0.5*v_vehicle, 1.3*v_vehicle, v_vehicle)
+        
+        # Lateral shift
         if lateral_shift is None:
             lateral_shift = random.uniform(-self.lateral_shift_range, self.lateral_shift_range)
         
-        frame, swa = lateral_shift_augmentation(frame, swa, frame_physical_width, v_vehicle, time_to_center, self.vehicle_turn_radius, self.vehicle_max_swa, lateral_shift, self.horizon_height, verbose=False)
+        frame, swa = lateral_shift_augmentation(frame, swa, frame_physical_width, v_vehicle, time_to_center,
+                                                self.vehicle_turn_radius, self.vehicle_max_swa, lateral_shift,
+                                                self.horizon_height, verbose=False)
         
+        # Horizonal rotation
         time_to_recover = 0.5 # seconds
         
         if hor_rotation is None:
             hor_rotation = random.uniform(-self.hor_rotation_range, self.hor_rotation_range)
             
-        frame, swa = horizontal_rotation_augmentation(frame, swa, self.frame_hor_fov_deg, v_vehicle, time_to_recover, self.vehicle_turn_radius, self.vehicle_max_swa, hor_rotation, verbose=False)
+        frame, swa = horizontal_rotation_augmentation(frame, swa, self.frame_hor_fov_deg, v_vehicle,
+                                                      time_to_recover, self.vehicle_turn_radius,
+                                                      self.vehicle_max_swa, hor_rotation, verbose=False)
         
+        # Horizontal flip
         do_flip = False
         if flip:
             do_flip = random.randint(0,1)
@@ -227,44 +238,84 @@ class RoadDataset(Sequence):
         
         self.csv = csv
         
+        
     def balance(self):
         csv = self.get_csv()
-        print("Balancing dataset. Starting with " + str(len(csv)) + " samples.")
         
-        # Create 18 bins a 5 deg
-        range_bins = [[5*i, 5*(i+1)] for i in range(-9, 9)]
-        #print(range_bins)
+        # Step 1: Reduce overrepresentation of swas near 0
+        print("Balancing dataset (step 1). Starting with " + str(len(csv)) +
+              " samples (Std. dev: {})".format(np.std(csv["steering_wheel_angle"])))
         
-        idx_bins = [[] for i in range(18)]
-        #print(idx_bins)
+        # Create 72 bins a 5 deg (-180 ... +180)
+        range_bins = [[5*i, 5*(i+1)] for i in range(-36, 36)]
+        idx_bins = [[] for i in range(72)]
         
         bin_counts = []
         
         for i, range_bin in enumerate(range_bins):
-            range_indices = csv[(csv["steering_wheel_angle"] >= range_bin[0]) & (csv["steering_wheel_angle"] < range_bin[1])].index.to_list()
+            range_indices = csv[(csv["steering_wheel_angle"] >= range_bin[0]) &
+                                (csv["steering_wheel_angle"] < range_bin[1])].index.to_list()
             idx_bins[i] = range_indices
             bin_counts.append(len(range_indices))
             
-        #median_bin_count = int(np.median(bin_counts))
-        #median_bin_count = int(min(bin_counts))
-        median_bin_count = int(np.sum(sorted(bin_counts)[:5]))
+        median_bin_count = int(np.mean(bin_counts))
+        #print(median_bin_count)
             
-        # Keep min_bin_sample_count samples in each bin, random sampling
+        # Keep median_bin_count samples in each bin, random sampling
         for i in range(len(idx_bins)):
             idx_bins[i] = random.sample(idx_bins[i], min(median_bin_count, len(idx_bins[i])))
-        
-        print(bin_counts)
-        print(median_bin_count)
         
         balanced_indices = []
         for indices in idx_bins:
             balanced_indices = [*balanced_indices, *indices]
-        #print(balanced_indices)
         
-        balanced_csv = csv[csv.index.isin(balanced_indices)]
+        csv = csv[csv.index.isin(balanced_indices)]
         
-        print(str(len(balanced_csv)) + " samples remaining.")
-        self.csv = balanced_csv
+        print(str(len(csv)) + " samples remaining after Balancing step 1" +
+              " (Std. dev: {})".format(np.std(csv["steering_wheel_angle"])))
+        
+        
+        
+        # Step 2: Increase symmetry
+        print("Balancing dataset (step 2). Starting with " + str(len(csv)) +
+              " samples")
+        
+        print("Mean: {})".format(np.mean(csv["steering_wheel_angle"])))
+        
+        keep_indices = []
+        for i in range(14):
+            neg_low_lim = -(i+1)**2
+            neg_high_lim = -i**2
+            
+            pos_low_lim = i**2
+            pos_high_lim = (i+1)**2
+            
+            neg_range_indices = csv[(csv["steering_wheel_angle"] >= neg_low_lim) &
+                                (csv["steering_wheel_angle"] < neg_high_lim)].index.to_list()
+            
+            pos_range_indices = csv[(csv["steering_wheel_angle"] >= pos_low_lim) &
+                                (csv["steering_wheel_angle"] < pos_high_lim)].index.to_list()
+            
+            neg_count = len(neg_range_indices)
+            pos_count = len(pos_range_indices)
+        
+            #print("Found {} samples in bin [{}...{}] vs. {} samples in bin [{}...{}]".format(
+            #    neg_count, neg_low_lim, neg_high_lim, pos_count, pos_low_lim, pos_high_lim))
+        
+            # keep lower count in both bins
+            lower_count = min(neg_count, pos_count)
+            #print("Keeping {} samples".format(lower_count))
+        
+            keep_indices.extend(random.sample(neg_range_indices, lower_count))
+            keep_indices.extend(random.sample(pos_range_indices, lower_count))
+        
+        csv = csv[csv.index.isin(keep_indices)]
+        
+        print(str(len(csv)) + " samples remaining after Balancing step 2")
+        print("Mean: {})".format(np.mean(csv["steering_wheel_angle"])))
+        print()
+        
+        self.csv = csv
         
         
     def get_csv(self):

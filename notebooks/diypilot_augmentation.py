@@ -111,7 +111,8 @@ def lateral_shift_augmentation(frame, orig_swa, frame_physical_width, v_vehicle,
 
         # Apply Perspective Transform Algorithm 
         matrix = cv2.getPerspectiveTransform(pts1, pts2) 
-        warped = cv2.warpPerspective(frame, matrix, (frame_width, frame_height), borderMode=cv2.BORDER_WRAP)
+        warped = cv2.warpPerspective(frame, matrix, (frame_width, frame_height), borderMode=cv2.BORDER_CONSTANT, 
+    borderValue=(0, 0, 0))
         
         # combine unwarped top part (above horizon) and warped bottom part (below horizon)
         

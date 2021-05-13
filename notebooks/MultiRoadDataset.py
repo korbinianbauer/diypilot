@@ -75,7 +75,7 @@ class MultiRoadDataset(Sequence):
     def get_sample(self, sample_index, augment=False, crop=False, normalize=False):
         
         for dataset in self.datasets:
-            if len(dataset) >= sample_index:
+            if len(dataset) > sample_index:
                 return dataset.get_sample(sample_index, augment, crop, normalize)
             sample_index -= len(dataset)
             
@@ -110,7 +110,7 @@ class MultiRoadDataset(Sequence):
         self.datasets = [dataset for dataset in self.datasets if len(dataset) > 0]
         set_count_after = len(self.datasets)
         
-        print("\n Dropped {} datasets with length==0, {} remaining".format(set_count_before-set_count_after, set_count_after))
+        print("\nDropped {} datasets with length==0, {} remaining".format(set_count_before-set_count_after, set_count_after))
         
     def balance(self):
         for dataset in self.datasets:
@@ -122,6 +122,11 @@ class MultiRoadDataset(Sequence):
         set_count_after = len(self.datasets)
         
         print("\n Dropped {} datasets with length==0, {} remaining".format(set_count_before-set_count_after, set_count_after))
+        
+        csv = self.get_csv()
+        print(str(len(csv)) + " samples remaining after Balancing")
+        print("Mean SWA: {})".format(np.mean(csv["steering_wheel_angle"])))
+        print("Std SWA: {})".format(np.std(csv["steering_wheel_angle"])))
         
     def get_csv(self):
         return pd.concat([dataset.get_csv()  for dataset in self.datasets])
