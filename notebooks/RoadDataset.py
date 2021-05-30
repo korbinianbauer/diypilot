@@ -19,9 +19,10 @@ class RoadDataset(Sequence):
         self.column_names = column_names
         try:
             print("Reading csv file: {}".format(csv_path))
-            self.csv = pd.read_csv(csv_path, names=column_names)
-        except:
+            self.csv = pd.read_csv(csv_path, names=column_names, engine='python')
+        except Exception as e:
             print("Failed to read csv file!")
+            print(e)
             self.csv = pd.DataFrame(columns = column_names)
         self.batch_size = batch_size
         self.mode = mode
@@ -35,7 +36,7 @@ class RoadDataset(Sequence):
         
         # Camera
         self.frame_hor_fov_deg = 69 # degree
-        self.latency_compensation_frames = 3 # frames
+        self.latency_compensation_frames = 0 # frames
         
         # ROI
         self.roi_y = 230
@@ -48,8 +49,10 @@ class RoadDataset(Sequence):
         self.lateral_shift_range = 0.5 # meter
         self.hor_rotation_range = 5 # degree
         
+        # Cleaning
+        self.swa_range = 45.0 # degrees
+        
         # Normalization
-        #self.swa_range = 90.0 # degrees
         self.velocity_range = 250.0 # km/h
         
         print('Loaded dataset with ' + str(len(self.csv)) + ' samples')
@@ -65,18 +68,24 @@ class RoadDataset(Sequence):
         batch_velocities = []
         batch_swas = []
         
-        for i in range(self.batch_size):
-            
-            sample_index = random.randint(0, len(self.csv)-1)
-            #sample_index = 100
-            sample = self.get_sample(sample_index, augment=True, crop=True, normalize=True)
-            frame = sample['frame']
-            v_vehicle = sample['v_vehicle']
-            swa = sample['swa']
+        while len(batch_frames) < self.batch_size:
+        #for i in range(self.batch_size):
+            try:
+                sample_index = random.randint(0, len(self.csv)-1)
+                #sample_index = 100
+                sample = self.get_sample(sample_index, augment=True, crop=True, normalize=True)
+                frame = sample['frame']
 
-            batch_frames.append(frame)
-            batch_velocities.append(v_vehicle)
-            batch_swas.append(swa)
+                #print("Still RGB? {}".format(frame))
+                v_vehicle = sample['v_vehicle']
+                swa = sample['swa']
+
+                batch_frames.append(frame)
+                batch_velocities.append(v_vehicle)
+                batch_swas.append(swa)
+            except Exception as e:
+                print("Failed adding sample to batch, try getting a new one")
+                print(e)
             
         batch_features = [np.array(batch_frames), np.array(batch_velocities)]
         batch_labels = np.array(batch_swas)
@@ -94,6 +103,7 @@ class RoadDataset(Sequence):
         csv = csv.iloc[sample_index]
         frame_path = self.frames_path + csv['filename']
         img = load_img(frame_path, color_mode='rgb')
+        #img = load_img('red.jpg', color_mode='rgb')
         frame = img_to_array(img, dtype=np.uint8)
         v_vehicle = csv['speed']
         swa = csv['steering_wheel_angle']
@@ -124,7 +134,7 @@ class RoadDataset(Sequence):
         return sample
         
         
-    def augment_sample(self, frame, orig_swa, v_vehicle, lateral_shift=None, hor_rotation=None, flip=False, aug_velocity=True):
+    def augment_sample(self, frame, orig_swa, v_vehicle, lateral_shift=None, hor_rotation=None, flip=False, aug_velocity=False):
         
         time_to_center = 2 # seconds
         frame_physical_width = 1450.0/1088.0*5.0 # meter
@@ -159,6 +169,7 @@ class RoadDataset(Sequence):
             do_flip = random.randint(0,1)
             
         if do_flip:
+            print("Flip!")
             frame, swa = horizontal_flip_augmentation(frame, swa)
         
         return frame, swa
@@ -213,9 +224,9 @@ class RoadDataset(Sequence):
         
         
         # Remove high Steering wheel angle samples
-        high_neg_swa_indices = csv[csv["steering_wheel_angle"] < -180].index
-        high_pos_swa_indices = csv[csv["steering_wheel_angle"] > 180].index
-        print("Removing " + str(len(high_neg_swa_indices) + len(high_pos_swa_indices)) + " rows for reason: High SWA (> +180/ < -180 deg)")
+        high_neg_swa_indices = csv[csv["steering_wheel_angle"] < -self.swa_range].index
+        high_pos_swa_indices = csv[csv["steering_wheel_angle"] > self.swa_range].index
+        print("Removing " + str(len(high_neg_swa_indices) + len(high_pos_swa_indices)) + " rows for reason: High SWA (> +{}/ < -{} deg)".format(self.swa_range, self.swa_range))
         csv = csv.drop(high_neg_swa_indices)
         csv = csv.drop(high_pos_swa_indices)
         
@@ -368,6 +379,9 @@ class RoadDataset(Sequence):
             arr2.append(x)
         return np.array(arr2)
     
+    def pairplot(self):
+        sns.pairplot(self.get_csv()[['steering_wheel_angle','speed']], diag_kind="kde")
+    
     ##########################################################################################
     
     
@@ -423,8 +437,7 @@ class RoadDataset(Sequence):
         
     
         
-    def pairplot(self):
-        sns.pairplot(self.get_csv(), diag_kind="kde")
+    
         
     
         

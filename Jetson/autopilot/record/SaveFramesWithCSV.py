@@ -269,7 +269,7 @@ def get_cam_frame():
     pipeline.stop()
     print("Camera read Thread finished")
     
-   
+
 def crop_to_roi(frame):
         roi_y = 230
         roi_h = 170
@@ -323,16 +323,16 @@ def write_sample_to_disk(record_dir, frame_dir):
 sample_writer()
         
 def run_inference_for_single_image(model_fn):
-  global NN_input_tensor
+    global NN_input_tensor
   
-  v_vehicle = get_speed(can_dict)/250
-  v_vehicle = np.asarray(v_vehicle).astype(np.float32)
-  v_vehicle_tensor = tf.convert_to_tensor([v_vehicle])
-  v_vehicle_tensor = v_vehicle_tensor[tf.newaxis,...]
-  # Run inference
-  return model_fn(input_1=NN_input_tensor, input_2=v_vehicle_tensor)
-  
-  
+    v_vehicle = get_speed(can_dict)/250
+    v_vehicle = np.asarray(v_vehicle).astype(np.float32)
+    v_vehicle_tensor = tf.convert_to_tensor([v_vehicle])
+    v_vehicle_tensor = v_vehicle_tensor[tf.newaxis,...]
+    # Run inference
+    return model_fn(input_1=NN_input_tensor, input_2=v_vehicle_tensor)
+
+
 def get_swa_from_predictions(predictions):
     #print(predictions)
     return tf.keras.backend.get_value(predictions['dense_3'])[0][0]

@@ -4,6 +4,8 @@ import pandas as pd
 import random
 import math
 import numpy as np
+import seaborn as sns
+
 
 from RoadDataset import RoadDataset
 
@@ -20,6 +22,7 @@ class MultiRoadDataset(Sequence):
     def addRoadDataset(self, csv_path, frames_path):
         
         dataset = RoadDataset(csv_path, frames_path, self.column_names, batch_size = 1)
+        #dataset.pairplot()
         self.datasets.append(dataset)
         
         #swas = dataset.get_csv()["steering_wheel_angle"]
@@ -47,7 +50,13 @@ class MultiRoadDataset(Sequence):
                 continue
             
             sample_idx = random.randint(0, len(dataset)-1)
-            sample = dataset[sample_idx]
+            
+            try:
+                sample = dataset[sample_idx]
+            except Exception as e:
+                print("Failed adding sample to batch, try getting a new one")
+                print(e)
+                continue
             #sample = dataset[0]
             
             frame = sample[0][0][0]
@@ -143,3 +152,6 @@ class MultiRoadDataset(Sequence):
     
     def denormalize_swa(self, swa_norm):
         return self.datasets[0].denormalize_swa(swa_norm)
+    
+    def pairplot(self):
+        sns.pairplot(self.get_csv()[['steering_wheel_angle','speed']], diag_kind="kde")
